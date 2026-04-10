@@ -1,19 +1,14 @@
-// api/claude.js — Vercel Serverless Function
-// Proxy seguro para a API da Anthropic
-export default async function handler(req, res) {
-  // Permite apenas POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // CORS — permite chamadas do próprio domínio
+// api/claude.js — Vercel Serverless Function (CommonJS)
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_KEY) {
-    return res.status(500).json({ error: 'API key não configurada no servidor.' });
-  }
+  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'API key nao configurada.' });
 
   try {
     const { system, messages, model, max_tokens } = req.body;
@@ -34,13 +29,9 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || 'Erro na API' });
-    }
-
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Erro na API' });
     return res.status(200).json(data);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
-}
+};
