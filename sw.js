@@ -1,4 +1,4 @@
-const CACHE = "finzap-v8";
+const CACHE = "finzap-v9";
 const ASSETS = ["/", "/index.html", "/manifest.json"];
 
 self.addEventListener("install", e => {
@@ -14,7 +14,7 @@ self.addEventListener("activate", e => {
 });
 
 self.addEventListener("fetch", e => {
-  // Nunca interceptar chamadas de API
+  // Nunca intercetar chamadas de API
   if (e.request.url.includes("/api/")) return;
   if (e.request.method !== "GET") return;
 
