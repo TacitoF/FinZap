@@ -97,6 +97,7 @@ html,body{
 .tab.active{background:var(--vi2); border-color:var(--vi2); color:#fff; font-weight:500}
 .tab.tab-special{ border-color:rgba(91,94,244,.3); color:var(--vi); }
 .tab.tab-special.active{ background:var(--vi); color:#fff; border-color:var(--vi); }
+.tab-icon { display:inline-block; vertical-align:middle; margin-top:-2px; margin-right:4px; }
 
 /* Main Content Area */
 .content-area{ flex:1; overflow-y:auto; position:relative; scrollbar-width:none; }
@@ -229,7 +230,10 @@ textarea.inp:focus{border-color:var(--b3)}
     <button class="tab" data-f="debito">Débito</button>
     <button class="tab" data-f="credito">Crédito</button>
     <button class="tab" data-f="pix">Pix</button>
-    <button class="tab tab-special" data-f="resumo">Resumo ✨</button>
+    <button class="tab tab-special" data-f="resumo">
+      <svg class="tab-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+      Resumo
+    </button>
   </div>
 
   <div class="content-area">
@@ -276,7 +280,7 @@ textarea.inp:focus{border-color:var(--b3)}
 
   <!-- Chat -->
   <div class="chat-area">
-    <div class="bubble" id="ai-bubble">Olá! Sou o <b>Finzap</b>. Conta-me a tua compra.</div>
+    <div class="bubble" id="ai-bubble">Oi! Sou o <b>Finzap</b>. Me conta sua compra.</div>
     <div class="dots" id="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
   </div>
 
@@ -310,13 +314,24 @@ let salario = parseFloat(localStorage.getItem('finzap_salario')) || 0;
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
-// ================= NAVEGAÇÃO E SINCRONIZAÇÃO =================
+// ================= FUNÇÕES DE APOIO E NORMALIZAÇÃO =================
 
 function strMesAno(dataObj) {
   const m = String(dataObj.getMonth() + 1).padStart(2, '0');
   const a = dataObj.getFullYear();
   return m + '/' + a;
 }
+
+function fmt(v){ return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+
+// Remove acentos, espaços e deixa tudo minúsculo para não quebrar os filtros das abas
+function normalizarTipo(tipo) {
+  if (!tipo) return 'debito';
+  let t = String(tipo).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return ['debito', 'credito', 'pix'].includes(t) ? t : 'debito';
+}
+
+// ================= NAVEGAÇÃO E SINCRONIZAÇÃO =================
 
 function mudarMes(offset) {
   dataVisualizacao.setMonth(dataVisualizacao.getMonth() + offset);
@@ -329,18 +344,20 @@ async function carregarDadosDaPlanilha() {
   document.getElementById('sync-icon').classList.add('on');
   
   try {
-    // Busca dados do mês na aguardando Apps Script GET
     const r = await fetch(`${SHEETS_URL}?mes=${encodeURIComponent(mesReq)}`);
     const data = await r.json();
     
     if (data.ok && data.mes === mesReq) {
-      txns = data.transacoes || [];
+      // Passa as transações pelo normalizador antes de salvar na memória
+      txns = (data.transacoes || []).map(t => ({
+        ...t,
+        tipo: normalizarTipo(t.tipo)
+      }));
     } else {
       txns = [];
     }
   } catch(e) {
     console.error("Erro ao sincronizar", e);
-    // Em caso de erro, apenas limpa a tela para não misturar meses
     txns = []; 
   }
   
@@ -351,13 +368,10 @@ async function carregarDadosDaPlanilha() {
 // Inicia o app carregando o mês atual
 carregarDadosDaPlanilha();
 
-
 // ================= REGRAS DE NEGÓCIO E RENDERIZAÇÃO =================
 
-function fmt(v){ return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-
 function editarSalario() {
-  let val = prompt("Qual a tua renda ou limite deste mês?", salario > 0 ? salario : "");
+  let val = prompt("Qual a sua renda ou limite deste mês?", salario > 0 ? salario : "");
   if (val !== null && val.trim() !== "") {
     let num = parseFloat(val.replace(/[^\d.,]/g, '').replace(',', '.'));
     if (!isNaN(num)) {
@@ -456,7 +470,6 @@ function renderizarTudo() {
   });
 }
 
-
 // ================= INTELIGÊNCIA ARTIFICIAL E CHAT =================
 
 function setBubble(html){ document.getElementById('ai-bubble').innerHTML = html; }
@@ -479,7 +492,6 @@ async function processar(txt){
 
   document.getElementById('dots').classList.add('on');
 
-  // Manda para a IA o contexto do mês que o utilizador está a visualizar
   const mesAtual = strMesAno(dataVisualizacao);
   const prompt = `Você é um assistente financeiro. Extraia os dados da compra em JSON.
 Responda APENAS JSON, sem markdown. Exemplo: {"produto":"nome","valor":123.45,"tipo":"debito|credito|pix","parcelas":1,"mesAno":"MM/YYYY"}
@@ -500,14 +512,15 @@ Hoje estamos visualizando o mês de ${mesAtual}. Se não for dito o mês na mens
     const match = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match ? match[0] : '{}');
 
-    if (parsed.tipo && !['debito', 'credito', 'pix'].includes(parsed.tipo)) parsed.tipo = 'debito';
+    // Passa pelo normalizador
+    parsed.tipo = normalizarTipo(parsed.tipo);
 
     if(parsed.erro || !parsed.valor){
-      setBubble(`Não percebi. Tenta: <b>"paguei 200 no pix na padaria"</b>`);
+      setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`);
       return;
     }
 
-    // Se a compra for para o mês que estamos visualizando, adiciona na ecrã na hora
+    // Adiciona na tela se o mês bater
     if(parsed.mesAno === mesAtual) {
       txns.push(parsed);
       renderizarTudo();
@@ -520,7 +533,7 @@ Hoje estamos visualizando o mês de ${mesAtual}. Se não for dito o mês na mens
 
   }catch(e){
     document.getElementById('dots').classList.remove('on');
-    setBubble('Erro ao processar. Tenta novamente.');
+    setBubble('Erro ao processar. Tente novamente.');
   }
 }
 
