@@ -2,7 +2,6 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<!-- 1. BLOQUEIO DE ZOOM PARA PARECER APP NATIVO -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" content="#07070e"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -158,7 +157,6 @@ textarea.inp:focus{border-color:var(--b3)}
 </head>
 <body>
 
-<!-- TELA DE LOGIN / REGISTRO -->
 <div id="login-screen">
   <div class="log-logo">
     <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/></svg>
@@ -178,7 +176,6 @@ textarea.inp:focus{border-color:var(--b3)}
 </div>
 
 <div id="app">
-  <!-- Header -->
   <div class="hdr">
     <div class="hdr-left">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -196,7 +193,6 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
   </div>
 
-  <!-- Balance -->
   <div class="balance">
     <div class="syncing" id="sync-icon"></div>
     <div class="balance-top">
@@ -211,7 +207,6 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-f="todos">Lista</button>
     <button class="tab" data-f="debito">Débito</button>
@@ -222,14 +217,11 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 
   <div class="content-area">
-    <!-- States -->
     <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Buscando dados...</div></div>
     <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"/></svg></div><p>Nenhum gasto encontrado.</p></div>
     
-    <!-- List -->
     <div class="txn-list" id="txn-list"></div>
 
-    <!-- Dashboard -->
     <div id="dashboard">
       <div class="dash-card">
         <div class="chart-container">
@@ -244,7 +236,6 @@ textarea.inp:focus{border-color:var(--b3)}
         </div>
       </div>
       
-      <!-- Grade de 8 KPIs -->
       <div class="kpi-grid">
         <div class="kpi-box"><div class="kpi-tit">Total Gasto</div><div class="kpi-val" id="kpi-gasto">R$ 0,00</div></div>
         <div class="kpi-box"><div class="kpi-tit">Ticket Médio</div><div class="kpi-val" id="kpi-ticket">R$ 0,00</div></div>
@@ -257,7 +248,6 @@ textarea.inp:focus{border-color:var(--b3)}
       </div>
     </div>
 
-    <!-- Configurações -->
     <div id="config-panel">
       <div class="cfg-section">
         <div class="cfg-title">Perfil do Usuário</div>
@@ -273,25 +263,22 @@ textarea.inp:focus{border-color:var(--b3)}
 
   </div>
 
-  <!-- Chat -->
   <div class="chat-area">
     <div class="bubble" id="ai-bubble">Oi! Sou o <b>Finzap</b>. Me conta sua compra.</div>
     <div class="dots" id="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
   </div>
 
-  <!-- Input -->
   <div class="input-row">
     <textarea class="inp" id="msg" placeholder='Ex: "200 no crédito no mercado"' rows="1"></textarea>
     <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="toast-msg"></span></div>
 
 <script>
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
-const SHEETS_URL   = "https://script.google.com/macros/s/AKfycbzaiLvy6INkwQBSNz0EybLQrkllJNf4BCdsDUNg_mau/devhttps://script.google.com/macros/s/AKfycbxTTSsjsXUWidIsRUcRQGKLiHgYCALPex7fyXVY_e2ttVTwAjNHKvRb_tPYaIFjnPJWAg/exec";
+const SHEETS_URL   = "https://script.google.com/macros/s/AKfycbxTTSsjsXUWidIsRUcRQGKLiHgYCALPex7fyXVY_e2ttVTwAjNHKvRb_tPYaIFjnPJWAg/exec";
 const CLAUDE_URL   = "/api/claude";
 
 let userId = localStorage.getItem('finzap_user') || "";
@@ -303,7 +290,6 @@ let fil = 'todos';
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
 // ================= FUNÇÕES AUXILIARES =================
-// Função à prova de falhas para valores br (vírgula) e us (ponto)
 function parseDinheiro(val) {
   let str = String(val).trim();
   if (str.includes(',')) {
@@ -374,7 +360,6 @@ function editExtra() {
       setRendaExtra(mesReq, 0);
     } else {
       let num = parseDinheiro(v);
-      // Se já tinha um valor, a lógica agora SOMA o novo valor ao montante existente
       setRendaExtra(mesReq, atual + num);
     }
     renderizarTudo();
@@ -392,7 +377,6 @@ async function carregarDadosDaPlanilha() {
   const mesReq = strMesAno(dataVisualizacao);
   document.getElementById('cur-month').textContent = mesReq;
   
-  // Cache Instantâneo
   const cacheStr = localStorage.getItem(`cache_${userId}_${mesReq}`);
   if(cacheStr) { txns = JSON.parse(cacheStr); renderizarTudo(); }
   else { document.getElementById('txn-list').innerHTML=''; document.getElementById('loading-state').style.display='flex'; }
@@ -420,12 +404,10 @@ function renderizarTudo() {
   
   const extraVal = getRendaExtra(mesReq);
 
-  // Atualiza Tela de Config
   document.getElementById('cfg-user').textContent = "@" + userId;
   document.getElementById('cfg-base').textContent = fmt(salarioBase);
   document.getElementById('cfg-extra').textContent = "+ " + fmt(extraVal);
 
-  // Atualiza Botão Principal de Renda Extra
   const btnExtra = document.getElementById('btn-main-extra');
   if (extraVal > 0) {
     btnExtra.textContent = `+ ${fmt(extraVal)} Extra`;
@@ -441,7 +423,6 @@ function renderizarTudo() {
   let parceladasAtivas = 0;
 
   txns.forEach(t => {
-    // Para compras parceladas, o "t.valor" que vem do backend já é o valor da parcela.
     tots[t.tipo] = (tots[t.tipo] || 0) + t.valor;
     catTots[t.categoria || 'Outros'] = (catTots[t.categoria || 'Outros'] || 0) + t.valor;
     if(t.valor > maiorCompra.valor) maiorCompra = t;
@@ -452,7 +433,6 @@ function renderizarTudo() {
   const rendaTotalMes = salarioBase + extraVal;
   const saldo = rendaTotalMes - gastos;
 
-  // Header Saldo
   const elTotal = document.getElementById('total');
   elTotal.textContent = fmt(saldo);
   elTotal.className = 'balance-amount ' + (saldo < 0 ? 'neg' : '');
@@ -460,7 +440,6 @@ function renderizarTudo() {
   document.getElementById('tot-cred').textContent = fmt(tots.credito);
   document.getElementById('tot-pix').textContent = fmt(tots.pix);
 
-  // Dashboard - Progresso
   let perc = 0;
   if(rendaTotalMes > 0) perc = Math.min(100, Math.round((gastos / rendaTotalMes) * 100));
   document.getElementById('dash-perc').textContent = perc + '%';
@@ -468,7 +447,6 @@ function renderizarTudo() {
   document.getElementById('chart-prog').setAttribute('stroke-dasharray', `${arco} 251.2`);
   document.getElementById('chart-prog').setAttribute('stroke', perc >= 90 ? '#f04060' : (perc >= 70 ? '#e8a020' : '#5b5ef4'));
 
-  // Dashboard - KPIs Matemáticos
   const diasNoMes = new Date(dataVisualizacao.getFullYear(), dataVisualizacao.getMonth() + 1, 0).getDate();
   let diaAtual = diasNoMes;
   if (dataVisualizacao.getMonth() === new Date().getMonth() && dataVisualizacao.getFullYear() === new Date().getFullYear()) {
@@ -492,7 +470,6 @@ function renderizarTudo() {
   document.getElementById('kpi-vol').textContent = txns.length;
   document.getElementById('kpi-parc').textContent = parceladasAtivas;
 
-  // Lista de Transações
   const list = document.getElementById('txn-list');
   const empty = document.getElementById('empty');
   
@@ -518,7 +495,6 @@ function renderizarTudo() {
       
       const el = document.createElement('div');
       el.className = `txn ${t.syncing ? 'syncing' : ''}`;
-      // Usando o index real da array original para poder excluir futuramente
       const realIndex = txns.indexOf(t); 
       
       el.innerHTML=`
@@ -544,16 +520,14 @@ function renderizarTudo() {
 
 // ================= DELETAR =================
 function excluirTxn(index) {
-  if(confirm("Deseja apagar esta compra da tela e da folha de cálculo?")) {
+  if(confirm("Deseja apagar esta compra da tela e da planilha?")) {
     const txnParaExcluir = txns[index];
     
-    // 1. Remove da memória local
     txns.splice(index, 1);
     const mesReq = strMesAno(dataVisualizacao);
     localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
     renderizarTudo();
     
-    // 2. Remove da Folha de Cálculo
     fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: {'Content-Type': 'application/json'},
@@ -565,7 +539,7 @@ function excluirTxn(index) {
         valor: txnParaExcluir.valor,
         tipo: txnParaExcluir.tipo
       })
-    }).then(() => toast("Compra eliminada com sucesso!"));
+    }).then(() => toast("Compra excluída com sucesso!"));
   }
 }
 
@@ -596,7 +570,6 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     if(parsed.erro || !parsed.valor) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
 
     if(parsed.mesAno === mesAtual) {
-      // CORREÇÃO DO PARCELADO: A interface otimista agora divide o valor antes de exibir!
       const valorParcelado = parsed.parcelas > 1 ? (parsed.valor / parsed.parcelas) : parsed.valor;
       
       const novaTxn = { ...parsed, valor: valorParcelado, valorTotal: parsed.valor, categoria: parsed.categoria || 'Outros', parcelaNum: 1, syncing: true };
@@ -605,11 +578,9 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
       if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
       else renderizarTudo();
 
-      // Manda pro Google
       fetch(SHEETS_URL,{ method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...parsed, user:userId, mensagem:txt}) })
       .then(() => { novaTxn.syncing = false; renderizarTudo(); localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); });
     } else {
-      // Se for pra outro mês, manda salvar direto sem mostrar
       fetch(SHEETS_URL,{ method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...parsed, user:userId, mensagem:txt}) });
     }
 
@@ -639,7 +610,6 @@ document.querySelectorAll('.tab').forEach(t=>{
   });
 });
 
-// Ao inicializar (se tiver user)
 if (userId) carregarDadosDaPlanilha();
 
 </script>
