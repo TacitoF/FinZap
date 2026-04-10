@@ -201,7 +201,7 @@ textarea.inp:focus{border-color:var(--b3)}
 
 <!-- TELA DE LOGIN -->
 <div id="login-screen">
-  <!-- iOS INSTALL PROMPT (Aparece na tela de Login e no App) -->
+  <!-- iOS INSTALL PROMPT -->
   <div id="ios-prompt" class="ios-prompt">
     <button class="ios-close" onclick="closeIOSPrompt()">✕</button>
     <p>Instale o Finzap no seu iPhone!</p>
@@ -605,16 +605,13 @@ function editExtra() {
 
 // ================= NAVEGAÇÃO E SYNC COM DEBOUNCE =================
 function mudarMes(offset) {
-  // Muda o mês na memória e na UI instantaneamente
   dataVisualizacao.setMonth(dataVisualizacao.getMonth() + offset);
   document.getElementById('cur-month').textContent = strMesAnoVisual(dataVisualizacao);
   
-  // Limpa a tela para dar UX de transição
   document.getElementById('txn-list').innerHTML=''; 
   document.getElementById('loading-state').style.display='flex';
   document.getElementById('empty').style.display='none';
   
-  // Debounce: Só busca os dados 350ms depois que o usuário parar de clicar
   clearTimeout(fetchTimer);
   fetchTimer = setTimeout(() => {
     carregarDadosDaPlanilha();
@@ -733,7 +730,6 @@ function renderizarTudo() {
       const c = {debito:'#1db87a', credito:'#f04060', pix:'#08b8d8'}[t.tipo] || '#9090b0';
       const bg = {debito:'ic-bg-g', credito:'ic-bg-r', pix:'ic-bg-c'}[t.tipo] || 'ic-bg-g';
       
-      // Ícones 100% blindados (tags fechadas explicitamente)
       const svgs = {
         debito: `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>`,
         credito:`<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"></rect><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"></path><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"></rect>`,
@@ -819,7 +815,8 @@ function processarExclusao(index, deleteAll) {
       valorTotal: txnParaExcluir.valorTotal || txnParaExcluir.valor, 
       tipo: txnParaExcluir.tipo,
       parcelas: txnParaExcluir.parcelas,
-      parcelaNum: txnParaExcluir.parcelaNum
+      parcelaNum: txnParaExcluir.parcelaNum,
+      idTransacao: txnParaExcluir.idTransacao
     })
   }).then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
 }
@@ -873,6 +870,9 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
       const parcelas = parsed.parcelas || 1;
       const valorParcela = parsed.valor_parcela || parsed.valor || 0;
       const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
+      
+      // Gera o ID único no momento em que a transação é criada pelo usuário
+      const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2);
 
       const novaTxn = { 
         ...parsed, 
@@ -880,7 +880,8 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
         valorTotal: valorTotal, 
         categoria: parsed.categoria || 'Outros', 
         parcelaNum: 1, 
-        syncing: true 
+        syncing: true,
+        idTransacao: idTx 
       };
       
       txns.push(novaTxn);
@@ -888,13 +889,14 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
       if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
       else renderizarTudo();
 
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt}) })
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx}) })
       .then(() => { novaTxn.syncing = false; renderizarTudo(); localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); });
     } else {
       const parcelas = parsed.parcelas || 1;
       const valorParcela = parsed.valor_parcela || parsed.valor || 0;
       const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt}) });
+      const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2);
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx}) });
     }
 
     const valExibir = parsed.valor_parcela || parsed.valor || 0;
