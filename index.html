@@ -174,7 +174,7 @@ textarea.inp:focus{border-color:var(--b3)}
 .modal-btn.danger { background:rgba(240,64,96,.1); color:var(--re); border:1px solid rgba(240,64,96,.2); }
 .modal-btn:active { transform:scale(0.96); }
 
-/* iOS Install Prompt Melhorado - Exibido na Tela de Login */
+/* iOS Install Prompt */
 .ios-prompt { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); width:calc(100% - 32px); max-width:390px; background:var(--s1); border:1px solid var(--vi); border-radius:16px; padding:16px 20px; z-index:4000; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.5); animation:up 0.4s ease; }
 .ios-close { position:absolute; top:10px; right:10px; background:none; border:none; color:var(--t3); font-size:18px; cursor:pointer; padding:5px; }
 .ios-prompt p { font-size:15px; font-weight:500; color:var(--t1); margin-bottom:12px; padding-right:20px; }
@@ -397,14 +397,17 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catc
 
 let apiQueue = Promise.resolve();
 
-// Fila inteligente para requisições não se atropelarem na nuvem
+// Fila inteligente: Absolutamente TODOS os POSTs passam por aqui para não atropelar a planilha
 function sendToAPI(payload) {
   const p = apiQueue.then(() => {
     return fetch(SHEETS_URL, {
       method: 'POST',
+      mode: 'no-cors', // OBRIGATÓRIO para forçar a Fila a esperar a requisição terminar de verdade sem dar erro no console
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
-    }).catch(e => console.error("API Error:", e));
+    })
+    .then(res => new Promise(resolve => setTimeout(resolve, 300))) // Dá 300ms de respiro para a Planilha destravar o LockService
+    .catch(e => console.error("API Error:", e));
   });
   apiQueue = p;
   return p;
@@ -851,13 +854,13 @@ Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
 Formato OBRIGATÓRIO:
 {"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "quantidade": 1, "mesAno":"MM/YYYY"}
 
-REGRAS MATEMÁTICAS (MUITO IMPORTANTE):
-- "valor_total" = valor total pago por 1 (UMA) única compra.
-- "valor_parcela" = valor de cada mensalidade (se à vista, é igual ao total).
-- "quantidade" = número de vezes que a compra ocorreu. NÃO SOME os valores na quantidade. Exemplo: "duas cobranças de 5,91" -> valor_total = 5.91, valor_parcela = 5.91, quantidade = 2.
-- Ex 1 ("2x de 15 reais"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2, quantidade = 1.
-- Ex 2 ("30 reais em 2x"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2, quantidade = 1.
-- Ex 3 ("120 todo mês até dezembro" e estamos no mês 10): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3, quantidade = 1.
+REGRAS MATEMÁTICAS OBRIGATÓRIAS:
+1. "valor_parcela": Valor de CADA mensalidade (ou o valor da compra se à vista).
+2. "valor_total": É o valor_parcela MULTIPLICADO pelo número de parcelas de UMA única compra.
+3. "quantidade": É quantas vezes a mesma compra ocorreu. NUNCA MULTIPLIQUE OS VALORES PELA QUANTIDADE!
+- Ex 1 ("2x de 15 reais"): valor_parcela = 15.00, valor_total = 30.00, parcelas = 2, quantidade = 1.
+- Ex 2 ("30 reais em 2x"): valor_parcela = 15.00, valor_total = 30.00, parcelas = 2, quantidade = 1.
+- Ex 3 ("duas cobranças de 5 reais"): valor_parcela = 5.00, valor_total = 5.00, parcelas = 1, quantidade = 2.
 - MÊS ATUAL: ${mesAtualNum}. Se o usuário disser "até o fim do ano", a quantidade de parcelas é EXATAMENTE (12 - ${mesAtualNum} + 1).
   
 Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
@@ -879,9 +882,9 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     if(parsed.erro || (!parsed.valor_parcela && !parsed.valor)) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
 
     const parcelas = parsed.parcelas || 1;
+    const quantidade = parsed.quantidade || 1;
     const valorParcela = parsed.valor_parcela || parsed.valor || 0;
     const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
-    const quantidade = parsed.quantidade || 1;
 
     for (let i = 0; i < quantidade; i++) {
       const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2) + i;
@@ -900,6 +903,7 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
         txns.push(novaTxn);
       }
       
+      // Envio para a Fila Única (A nuvem processa na ordem correta)
       sendToAPI({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx})
       .then(() => { 
         if(parsed.mesAno === mesAtual) {
