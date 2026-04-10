@@ -434,10 +434,19 @@ async function processar(txt){
     const data = await r.json();
     document.getElementById('dots').classList.remove('on');
 
-    const raw    = data.content?.[0]?.text||'{}';
-    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const raw = data.content?.[0]?.text || '{}';
+    
+    // 1. Regex à prova de falhas: extrai apenas o bloco entre as chaves { }
+    const match = raw.match(/\{[\s\S]*\}/);
+    const jsonStr = match ? match[0] : '{}';
+    const parsed = JSON.parse(jsonStr);
 
-    if(parsed.erro){
+    // 2. Trava de segurança: se a IA inventar um tipo (ex: "dinheiro"), joga para "debito"
+    if (parsed.tipo && !['debito', 'credito', 'pix'].includes(parsed.tipo)) {
+      parsed.tipo = 'debito';
+    }
+
+    if(parsed.erro || !parsed.valor){
       setBubble(`Não entendi. Tente: <b>"paguei 200 no cartão em 3x na Renner"</b>`);
       return;
     }
@@ -454,6 +463,7 @@ async function processar(txt){
     salvar(parsed,txt);
 
   }catch(e){
+    console.error("Erro interno capturado:", e);
     document.getElementById('dots').classList.remove('on');
     setBubble('Erro ao processar. Verifique sua conexão.');
   }
