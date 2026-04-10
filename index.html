@@ -397,16 +397,17 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catc
 
 let apiQueue = Promise.resolve();
 
-// Fila inteligente: Absolutamente TODOS os POSTs passam por aqui para não atropelar a planilha
+// Fila inteligente: Absolutamente TODOS os POSTs passam por aqui.
+// REMOVIDO: o mode 'no-cors'. Agora usamos requests normais que sincronizam PERFEITAMENTE a fila!
 function sendToAPI(payload) {
   const p = apiQueue.then(() => {
     return fetch(SHEETS_URL, {
       method: 'POST',
-      mode: 'no-cors', // OBRIGATÓRIO para forçar a Fila a esperar a requisição terminar de verdade sem dar erro no console
+      // Sem no-cors: agora a Promise SÓ resolve quando a planilha devolver o JSON de sucesso
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
     })
-    .then(res => new Promise(resolve => setTimeout(resolve, 300))) // Dá 300ms de respiro para a Planilha destravar o LockService
+    .then(res => res.json()) 
     .catch(e => console.error("API Error:", e));
   });
   apiQueue = p;
@@ -903,7 +904,7 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
         txns.push(novaTxn);
       }
       
-      // Envio para a Fila Única (A nuvem processa na ordem correta)
+      // Envio para a Fila Única (A nuvem processa na ordem correta, sem atropelos)
       sendToAPI({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx})
       .then(() => { 
         if(parsed.mesAno === mesAtual) {
