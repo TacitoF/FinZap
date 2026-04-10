@@ -1,5 +1,3 @@
-// api/claude.js — Vercel Serverless Function (CommonJS)
-
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -12,7 +10,6 @@ module.exports = async function handler(req, res) {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'API key nao configurada.' });
 
   try {
-    // Parse manual do body caso não venha parsed automaticamente
     let body = req.body;
     if (typeof body === 'string') {
       body = JSON.parse(body);
