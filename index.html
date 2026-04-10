@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
+<!-- 1. BLOQUEIO DE ZOOM PARA PARECER APP NATIVO -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" content="#07070e"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -140,14 +141,16 @@ textarea.inp:focus{border-color:var(--b3)}
 .btn{ width:44px; height:44px; border-radius:50%; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:all .18s; background:var(--vi2); }
 .btn:active{transform:scale(.93)}
 
-/* Tela de Login/Onboarding */
-#login-screen { position:absolute; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:999; display:none; flex-direction:column; align-items:center; justify-content:center; padding:30px; }
+/* Telas de Login/Registro */
+#login-screen, #register-screen { position:absolute; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:999; display:none; flex-direction:column; align-items:center; justify-content:center; padding:30px; }
 .log-logo { margin-bottom:40px; display:flex; flex-direction:column; align-items:center; gap:15px; }
 .log-box { background:var(--s1); border:1px solid var(--b1); border-radius:16px; padding:24px; width:100%; max-width:320px; display:flex; flex-direction:column; gap:16px; }
 .log-box label { font-size:12px; color:var(--t3); text-transform:uppercase; letter-spacing:1px; }
 .log-input { width:100%; background:var(--s2); border:1px solid var(--b2); padding:14px; border-radius:12px; color:var(--t1); font-size:16px; outline:none; font-family:'DM Sans'; }
 .log-input:focus { border-color:var(--vi); }
 .log-btn { background:var(--vi); color:#fff; border:none; padding:16px; border-radius:12px; font-size:15px; font-weight:500; cursor:pointer; margin-top:10px; }
+.log-link { color:var(--vi); font-size:13px; text-align:center; cursor:pointer; margin-top:5px; font-weight:500; transition: opacity 0.2s; }
+.log-link:active { opacity: 0.6; }
 
 /* Toast */
 .toast{ position:fixed; top:calc(env(safe-area-inset-top) + 54px); left:50%; transform:translateX(-50%) translateY(-6px); background:#0f2219; border:1px solid rgba(29,184,122,.25); color:#5edda8; font-size:12px; font-weight:500; padding:9px 16px; border-radius:20px; white-space:nowrap; opacity:0; transition:all .28s; pointer-events:none; z-index:1000; display:flex; align-items:center; gap:7px; }
@@ -157,6 +160,7 @@ textarea.inp:focus{border-color:var(--b3)}
 </head>
 <body>
 
+<!-- TELA DE LOGIN -->
 <div id="login-screen">
   <div class="log-logo">
     <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/></svg>
@@ -165,17 +169,35 @@ textarea.inp:focus{border-color:var(--b3)}
   <div class="log-box">
     <div>
       <label>Seu Nome ou Usuário</label>
+      <input type="text" id="log-name" class="log-input" placeholder="Ex: Tacito" autocomplete="off">
+    </div>
+    <button class="log-btn" onclick="fazerLogin()">Entrar na Conta</button>
+    <div class="log-link" onclick="irParaRegistro()">Não tem uma conta? Criar agora</div>
+  </div>
+</div>
+
+<!-- TELA DE REGISTRO -->
+<div id="register-screen">
+  <div class="log-logo">
+    <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/></svg>
+    <div class="hdr-wordmark" style="font-size:24px;">fin<span>zap</span></div>
+  </div>
+  <div class="log-box">
+    <div>
+      <label>Escolha um Nome ou Usuário</label>
       <input type="text" id="reg-name" class="log-input" placeholder="Ex: Tacito" autocomplete="off">
     </div>
     <div>
-      <label>Salário Base / Renda</label>
+      <label>Salário Base / Renda Fixa</label>
       <input type="number" id="reg-sal" class="log-input" placeholder="Ex: 3500" autocomplete="off">
     </div>
-    <button class="log-btn" onclick="iniciarApp()">Entrar no Finzap</button>
+    <button class="log-btn" onclick="fazerRegistro()">Criar Conta</button>
+    <div class="log-link" onclick="irParaLogin()">Já tenho uma conta. Fazer login</div>
   </div>
 </div>
 
 <div id="app">
+  <!-- Header -->
   <div class="hdr">
     <div class="hdr-left">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -193,6 +215,7 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
   </div>
 
+  <!-- Balance -->
   <div class="balance">
     <div class="syncing" id="sync-icon"></div>
     <div class="balance-top">
@@ -207,6 +230,7 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
   </div>
 
+  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-f="todos">Lista</button>
     <button class="tab" data-f="debito">Débito</button>
@@ -217,11 +241,14 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 
   <div class="content-area">
+    <!-- States -->
     <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Buscando dados...</div></div>
     <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"/></svg></div><p>Nenhum gasto encontrado.</p></div>
     
+    <!-- List -->
     <div class="txn-list" id="txn-list"></div>
 
+    <!-- Dashboard -->
     <div id="dashboard">
       <div class="dash-card">
         <div class="chart-container">
@@ -236,6 +263,7 @@ textarea.inp:focus{border-color:var(--b3)}
         </div>
       </div>
       
+      <!-- Grade de 8 KPIs -->
       <div class="kpi-grid">
         <div class="kpi-box"><div class="kpi-tit">Total Gasto</div><div class="kpi-val" id="kpi-gasto">R$ 0,00</div></div>
         <div class="kpi-box"><div class="kpi-tit">Ticket Médio</div><div class="kpi-val" id="kpi-ticket">R$ 0,00</div></div>
@@ -248,6 +276,7 @@ textarea.inp:focus{border-color:var(--b3)}
       </div>
     </div>
 
+    <!-- Configurações -->
     <div id="config-panel">
       <div class="cfg-section">
         <div class="cfg-title">Perfil do Usuário</div>
@@ -263,17 +292,20 @@ textarea.inp:focus{border-color:var(--b3)}
 
   </div>
 
+  <!-- Chat -->
   <div class="chat-area">
     <div class="bubble" id="ai-bubble">Oi! Sou o <b>Finzap</b>. Me conta sua compra.</div>
     <div class="dots" id="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
   </div>
 
+  <!-- Input -->
   <div class="input-row">
     <textarea class="inp" id="msg" placeholder='Ex: "200 no crédito no mercado"' rows="1"></textarea>
     <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
 </div>
 
+<!-- Toast -->
 <div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="toast-msg"></span></div>
 
 <script>
@@ -310,11 +342,32 @@ if (!userId) {
   document.getElementById('login-screen').style.display = 'flex';
 }
 
-function iniciarApp() {
+function irParaRegistro() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('register-screen').style.display = 'flex';
+}
+
+function irParaLogin() {
+  document.getElementById('register-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function fazerLogin() {
+  const nome = document.getElementById('log-name').value.trim();
+  if(nome.length < 2) return alert("Digite um nome ou usuário válido");
+  
+  userId = nome.toLowerCase().replace(/\s/g, '');
+  localStorage.setItem('finzap_user', userId);
+  
+  document.getElementById('login-screen').style.display = 'none';
+  carregarDadosDaPlanilha();
+}
+
+function fazerRegistro() {
   const nome = document.getElementById('reg-name').value.trim();
   const sal = parseDinheiro(document.getElementById('reg-sal').value);
   
-  if(nome.length < 2) return alert("Digite um nome válido");
+  if(nome.length < 2) return alert("Digite um nome ou usuário válido");
   
   userId = nome.toLowerCase().replace(/\s/g, '');
   salarioBase = sal;
@@ -322,7 +375,7 @@ function iniciarApp() {
   localStorage.setItem('finzap_user', userId);
   localStorage.setItem('finzap_salario_base', salarioBase);
   
-  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('register-screen').style.display = 'none';
   carregarDadosDaPlanilha();
 }
 
