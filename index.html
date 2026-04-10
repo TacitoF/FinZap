@@ -812,12 +812,15 @@ function excluirTxn(index) {
 
 function processarExclusao(index, deleteAll) {
   const txnParaExcluir = txns[index];
-  txns.splice(index, 1);
   const mesReq = strMesAnoBackend(dataVisualizacao);
 
-  if (deleteAll) {
-    invalidarCaches(); 
-  }
+  // Remove da UI imediatamente (otimista)
+  txns.splice(index, 1);
+
+  // Ao deletar TODAS as parcelas, invalida caches de todos os meses
+  // Ao deletar SÓ UMA parcela, invalida também os outros meses pois as
+  // parcelas restantes ainda existem e o cache deles pode estar desatualizado
+  invalidarCaches();
   
   localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
   renderizarTudo();
@@ -836,10 +839,21 @@ function processarExclusao(index, deleteAll) {
   }).then(res => {
     if (res && res.ok) {
       toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!");
+      // Recarrega do servidor para garantir que a UI reflita o estado real da planilha
+      carregarDadosDaPlanilha();
     } else {
+      // Rollback: devolve o item ao array e ao cache se a API falhou
+      txns.splice(index, 0, txnParaExcluir);
+      localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
+      renderizarTudo();
       toast("Erro ao excluir da planilha. Tente novamente.", true);
     }
-  }).catch(() => toast("Erro de conexão ao excluir.", true));
+  }).catch(() => {
+    txns.splice(index, 0, txnParaExcluir);
+    localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
+    renderizarTudo();
+    toast("Erro de conexão ao excluir.", true);
+  });
 }
 
 // ================= IA E OTIMISTA =================
