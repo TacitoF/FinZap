@@ -174,15 +174,15 @@ textarea.inp:focus{border-color:var(--b3)}
 .modal-btn.danger { background:rgba(240,64,96,.1); color:var(--re); border:1px solid rgba(240,64,96,.2); }
 .modal-btn:active { transform:scale(0.96); }
 
-/* iOS Install Prompt */
-.ios-prompt { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); width:calc(100% - 32px); max-width:390px; background:var(--s1); border:1px solid var(--vi); border-radius:16px; padding:16px 20px; z-index:2500; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.5); animation:up 0.4s ease; }
+/* iOS Install Prompt Melhorado - Exibido na Tela de Login */
+.ios-prompt { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); width:calc(100% - 32px); max-width:390px; background:var(--s1); border:1px solid var(--vi); border-radius:16px; padding:16px 20px; z-index:4000; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.5); animation:up 0.4s ease; }
 .ios-close { position:absolute; top:10px; right:10px; background:none; border:none; color:var(--t3); font-size:18px; cursor:pointer; padding:5px; }
 .ios-prompt p { font-size:15px; font-weight:500; color:var(--t1); margin-bottom:12px; padding-right:20px; }
 .ios-sub { font-size:13px; color:var(--t2); display:flex; flex-direction:column; gap:8px; line-height:1.4;}
 .ios-sub span b { color: var(--vi); }
 
 /* Toast */
-.toast{ position:fixed; top:calc(env(safe-area-inset-top) + 54px); left:50%; transform:translateX(-50%) translateY(-6px); background:#0f2219; border:1px solid rgba(29,184,122,.25); color:#5edda8; font-size:12px; font-weight:500; padding:9px 16px; border-radius:20px; white-space:nowrap; opacity:0; transition:all .28s; pointer-events:none; z-index:4000; display:flex; align-items:center; gap:7px; }
+.toast{ position:fixed; top:calc(env(safe-area-inset-top) + 54px); left:50%; transform:translateX(-50%) translateY(-6px); background:#0f2219; border:1px solid rgba(29,184,122,.25); color:#5edda8; font-size:12px; font-weight:500; padding:9px 16px; border-radius:20px; white-space:nowrap; opacity:0; transition:all .28s; pointer-events:none; z-index:5000; display:flex; align-items:center; gap:7px; }
 .toast.err{background:#200f14; border-color:rgba(240,64,96,.25); color:#f88898}
 .toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
 </style>
@@ -199,19 +199,19 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 </div>
 
-<!-- iOS INSTALL PROMPT (Aparece na tela de Login e no App) -->
-<div id="ios-prompt" class="ios-prompt">
-  <button class="ios-close" onclick="closeIOSPrompt()">✕</button>
-  <p>Instale o Finzap no seu iPhone!</p>
-  <div class="ios-sub">
-    <span>1. Clique em <b>Compartilhar</b> (ícone da setinha ou nos <b>...</b> três pontos)</span>
-    <span>2. Deslize e clique em <b>Ver mais</b> (se necessário)</span>
-    <span>3. Escolha <b>Adicionar à Tela de Início</b></span>
-  </div>
-</div>
-
 <!-- TELA DE LOGIN -->
 <div id="login-screen">
+  <!-- iOS INSTALL PROMPT (Aparece na tela de Login e no App) -->
+  <div id="ios-prompt" class="ios-prompt">
+    <button class="ios-close" onclick="closeIOSPrompt()">✕</button>
+    <p>Instale o Finzap no seu iPhone!</p>
+    <div class="ios-sub">
+      <span>1. Clique em <b>Compartilhar</b> (ícone da setinha ou nos <b>...</b> três pontos)</span>
+      <span>2. Deslize e clique em <b>Ver mais</b> (se necessário)</span>
+      <span>3. Escolha <b>Adicionar à Tela de Início</b></span>
+    </div>
+  </div>
+
   <div class="log-logo">
     <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/></svg>
     <div class="hdr-wordmark" style="font-size:24px;">fin<span>zap</span></div>
@@ -405,6 +405,10 @@ function normalizarTipo(tipo) {
   let t = String(tipo||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   return ['debito', 'credito', 'pix'].includes(t) ? t : 'debito';
 }
+function invalidarCaches() {
+  const keys = Object.keys(localStorage);
+  keys.forEach(k => { if(k.startsWith(`cache_${userId}_`)) localStorage.removeItem(k); });
+}
 
 // ================= MODAIS PERSONALIZADOS =================
 let modalCallback = null;
@@ -422,7 +426,6 @@ function showModal(opts) {
   const actions = document.getElementById('modal-actions-container');
   actions.innerHTML = '';
   
-  // Decide se usa colunas (para 3+ botões) ou linhas
   actions.className = (opts.customButtons && opts.customButtons.length > 2) ? 'modal-actions col' : 'modal-actions row';
 
   if (opts.customButtons) {
@@ -481,10 +484,9 @@ function closeIOSPrompt() {
 // ================= LOGIN / ONBOARDING =================
 if (!userId) {
   document.getElementById('login-screen').style.display = 'flex';
-  checkIOS(); // Aparece já na primeira tela
+  checkIOS(); 
 } else {
   document.getElementById('app').style.display = 'flex';
-  checkIOS();
   carregarDadosDaPlanilha();
 }
 
@@ -501,13 +503,15 @@ async function fazerLogin() {
   btn.textContent = "Entrando..."; btn.disabled = true;
 
   try {
-    const r = await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'login', username: user, password: pass }) });
+    const url = `${SHEETS_URL}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+    const r = await fetch(url);
     const res = await r.json();
+    
     if (res.ok) {
       userId = user; userName = res.nome; salarioBase = parseFloat(res.salarioBase) || 0;
       localStorage.setItem('finzap_user', userId); localStorage.setItem('finzap_nome', userName); localStorage.setItem('finzap_salario_base', salarioBase);
       document.getElementById('login-screen').style.display = 'none'; document.getElementById('app').style.display = 'flex';
-      checkIOS(); carregarDadosDaPlanilha();
+      carregarDadosDaPlanilha();
     } else { showModal({title:"Atenção", desc:res.erro || "Erro ao entrar."}); }
   } catch(e) { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
   
@@ -526,13 +530,15 @@ async function fazerRegistro() {
   btn.textContent = "Criando..."; btn.disabled = true;
 
   try {
-    const r = await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'register', nome: nome, username: user, password: pass, salarioBase: sal }) });
+    const url = `${SHEETS_URL}?action=register&nome=${encodeURIComponent(nome)}&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&salarioBase=${encodeURIComponent(sal)}`;
+    const r = await fetch(url);
     const res = await r.json();
+    
     if (res.ok) {
       userId = user; userName = res.nome; salarioBase = parseFloat(res.salarioBase) || 0;
       localStorage.setItem('finzap_user', userId); localStorage.setItem('finzap_nome', userName); localStorage.setItem('finzap_salario_base', salarioBase);
       document.getElementById('register-screen').style.display = 'none'; document.getElementById('app').style.display = 'flex';
-      checkIOS(); carregarDadosDaPlanilha();
+      carregarDadosDaPlanilha();
     } else { showModal({title:"Atenção", desc:res.erro || "Erro ao criar conta."}); }
   } catch(e) { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
   
@@ -565,7 +571,7 @@ function editBase() {
         localStorage.setItem('finzap_salario_base', salarioBase);
         renderizarTudo();
         toast("Salvando na nuvem...");
-        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'updateBase', user: userId, salarioBase: salarioBase }) }).then(() => toast("Salvo na nuvem!"));
+        fetch(SHEETS_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'updateBase', user: userId, salarioBase: salarioBase }) }).then(() => toast("Salvo na nuvem!"));
       }
     }
   });
@@ -591,7 +597,7 @@ function editExtra() {
         setRendaExtra(mesReq, num);
         renderizarTudo();
         toast("Salvando na nuvem...");
-        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'updateExtra', user: userId, mesAno: mesReq, valor: num }) }).then(() => toast("Salvo na nuvem!"));
+        fetch(SHEETS_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'updateExtra', user: userId, mesAno: mesReq, valor: num }) }).then(() => toast("Salvo na nuvem!"));
       }
     }
   });
@@ -779,13 +785,17 @@ function processarExclusao(index, deleteAll) {
   const txnParaExcluir = txns[index];
   txns.splice(index, 1);
   const mesReq = strMesAnoBackend(dataVisualizacao);
+
+  if (deleteAll) {
+    invalidarCaches(); // Limpa memória para forçar atualização e sumir com parcelas futuras
+  }
+  
   localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
   renderizarTudo();
   
-  // MANDAMOS O NÚMERO DA PARCELA PARA O BACKEND DESCOBRIR ONDE ESTÃO AS OUTRAS
   fetch(SHEETS_URL, {
-    method: 'POST', mode: 'no-cors',
-    headers: {'Content-Type': 'application/json'},
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // Sem No-Cors para enviar Payload de forma Segura
     body: JSON.stringify({ 
       action: deleteAll ? 'delete_all' : 'delete', 
       user: userId, 
@@ -839,10 +849,10 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
       if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
       else renderizarTudo();
 
-      fetch(SHEETS_URL,{ method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...parsed, user:userId, mensagem:txt}) })
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, user:userId, action:'save', mensagem:txt}) })
       .then(() => { novaTxn.syncing = false; renderizarTudo(); localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); });
     } else {
-      fetch(SHEETS_URL,{ method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...parsed, user:userId, mensagem:txt}) });
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, user:userId, action:'save', mensagem:txt}) });
     }
 
     const pm = parsed.parcelas>1 ? `, em <b>${parsed.parcelas}x</b>` : '';
