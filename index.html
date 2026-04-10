@@ -80,9 +80,9 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 .loading-state .dot:nth-child(3) { animation-delay:0.3s; }
 .loading-text { font-size:13px; color:var(--t3); letter-spacing:0.5px; }
 
-/* Transacoes (CORREÇÃO DE BUG VISUAL AQUI) */
+/* Transacoes */
 .txn{ background:var(--s1); border:1px solid var(--b1); border-radius:var(--rs); padding:11px 13px; margin-bottom:7px; display:flex; align-items:center; gap:11px; animation:up .22s ease; position:relative; overflow:hidden;}
-.txn.is-syncing { opacity: 0.6; border-style: dashed; pointer-events: none; }
+.txn.is-syncing { opacity: 0.6; }
 @keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .txn-ic{ width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .ic-bg-g{background:rgba(29,184,122,.1)} .ic-bg-r{background:rgba(240,64,96,.1)} .ic-bg-c{background:rgba(8,184,216,.1)}
@@ -96,10 +96,10 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 .bdg-g{background:rgba(29,184,122,.1); color:#5edda8} .bdg-r{background:rgba(240,64,96,.1); color:#f88898} .bdg-c{background:rgba(8,184,216,.1); color:#50d8f0} .bdg-a{background:rgba(232,160,32,.1); color:#f0c060} .bdg-cat{background:var(--b2); color:var(--t2)}
 
 /* Spinner de Sincronização SVG embutido */
-.spin-icon { width: 14px; height: 14px; animation: spin 1s linear infinite; color: var(--vi); position: absolute; right: 0; top: 1px; }
+.spin-icon { width: 12px; height: 12px; animation: spin 1s linear infinite; color: var(--vi); position: absolute; right: 0; top: 2px; }
 
 /* Botão Excluir */
-.btn-del { width: 34px; height: 100%; position: absolute; right: 0; top: 0; background: rgba(240,64,96,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #f88898; transition: 0.2s; }
+.btn-del { width: 30px; height: 100%; position: absolute; right: 0; top: 0; background: rgba(240,64,96,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #f88898; transition: 0.2s; }
 .btn-del:active { background: rgba(240,64,96,.3); }
 
 /* Dashboard (Resumo) */
@@ -213,7 +213,7 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 
   <div class="log-logo">
-    <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/></svg>
+    <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"></rect><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"></path><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect></svg>
     <div class="hdr-wordmark" style="font-size:24px;">fin<span>zap</span></div>
   </div>
   <div class="log-box">
@@ -233,7 +233,7 @@ textarea.inp:focus{border-color:var(--b3)}
 <!-- TELA DE REGISTRO -->
 <div id="register-screen">
   <div class="log-logo">
-    <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/></svg>
+    <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"></rect><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"></path><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect></svg>
     <div class="hdr-wordmark" style="font-size:24px;">fin<span>zap</span></div>
   </div>
   <div class="log-box">
@@ -264,17 +264,17 @@ textarea.inp:focus{border-color:var(--b3)}
   <div class="hdr">
     <div class="hdr-left">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"/>
-        <rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/>
-        <path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"/>
-        <rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"/>
+        <rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"></rect>
+        <rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect>
+        <path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"></path>
+        <rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect>
       </svg>
       <div class="hdr-wordmark">fin<span>zap</span></div>
     </div>
     <div class="hdr-nav">
-      <button class="nav-btn" onclick="mudarMes(-1)" aria-label="Mês Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="nav-btn" onclick="mudarMes(-1)" aria-label="Mês Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
       <div class="hdr-month" id="cur-month">---/----</div>
-      <button class="nav-btn" onclick="mudarMes(1)" aria-label="Próximo Mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="nav-btn" onclick="mudarMes(1)" aria-label="Próximo Mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
     </div>
   </div>
 
@@ -311,7 +311,7 @@ textarea.inp:focus{border-color:var(--b3)}
   <div class="content-area">
     <!-- States -->
     <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Buscando dados...</div></div>
-    <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"/></svg></div><p>Nenhum gasto encontrado.</p></div>
+    <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"></path></svg></div><p>Nenhum gasto encontrado.</p></div>
     
     <!-- List -->
     <div class="txn-list" id="txn-list"></div>
@@ -369,12 +369,12 @@ textarea.inp:focus{border-color:var(--b3)}
   <!-- Input -->
   <div class="input-row">
     <textarea class="inp" id="msg" placeholder='Ex: "200 no crédito no mercado"' rows="1"></textarea>
-    <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
   </div>
 </div>
 
 <!-- Toast -->
-<div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="toast-msg"></span></div>
+<div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg><span id="toast-msg"></span></div>
 
 <script>
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
@@ -719,19 +719,20 @@ function renderizarTudo() {
     [...vis].reverse().forEach((t) => {
       const c = {debito:'#1db87a', credito:'#f04060', pix:'#08b8d8'}[t.tipo] || '#9090b0';
       const bg = {debito:'ic-bg-g', credito:'ic-bg-r', pix:'ic-bg-c'}[t.tipo] || 'ic-bg-g';
+      
+      // Ícones 100% blindados (tags fechadas explicitamente)
       const svgs = {
-        debito: `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-        credito:`<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"/><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"/><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"/>`,
-        pix:    `<path d="M11 3.5L8 10h3.5L9 16.5" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+        debito: `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>`,
+        credito:`<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"></rect><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"></path><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"></rect>`,
+        pix:    `<path d="M11 3.5L8 10h3.5L9 16.5" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>`
       };
       const bdgs = {debito:['Débito','bdg-g'], credito:['Crédito','bdg-r'], pix:['Pix','bdg-c']}[t.tipo] || ['Outro','bdg-g'];
       
       const sub = t.parcelas>1 ? `Parcela ${t.parcelaNum||1}/${t.parcelas} · ${t.data||t.mesAno}` : (t.data||t.mesAno);
       const catBadge = t.categoria && t.categoria !== 'Outros' ? `<span class="bdg bdg-cat">${t.categoria}</span>` : '';
       
-      let spinIcon = t.syncing ? `<svg class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>` : '';
+      let spinIcon = t.syncing ? `<svg class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>` : '';
       
-      // O Bug era a classe "syncing" no elemento pai colidindo com o loader do cabecalho
       const el = document.createElement('div');
       el.className = `txn ${t.syncing ? 'is-syncing' : ''}`;
       const realIndex = txns.indexOf(t); 
@@ -764,7 +765,7 @@ function excluirTxn(index) {
   if (txnParaExcluir.parcelas > 1) {
     showModal({
       title: "Excluir Parcelamento",
-      desc: `Esta compra (${txnParaExcluir.produto}) é parcelada ou recorrente em ${txnParaExcluir.parcelas}x.\nO que você deseja fazer?`,
+      desc: `Esta compra (${txnParaExcluir.produto}) é parcelada em ${txnParaExcluir.parcelas}x.\nO que você deseja fazer?`,
       customButtons: [
         { text: "Excluir Todas as Parcelas", class: "danger", onClick: () => processarExclusao(index, true) },
         { text: "Excluir Só Esta Parcela", class: "confirm", onClick: () => processarExclusao(index, false) },
@@ -787,7 +788,7 @@ function processarExclusao(index, deleteAll) {
   const mesReq = strMesAnoBackend(dataVisualizacao);
 
   if (deleteAll) {
-    invalidarCaches(); // Limpa cache para forçar os próximos meses a buscar versão sem parcelas
+    invalidarCaches(); 
   }
   
   localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
@@ -820,12 +821,19 @@ async function processar(txt){
   document.getElementById('dots').classList.add('on');
 
   const mesAtual = strMesAnoBackend(dataVisualizacao);
-  const prompt = `Você é um assistente financeiro. Extraia os dados da compra.
-Responda APENAS JSON válido. 
-Exemplo Padrão: {"produto":"nome","valor":123.45,"tipo":"debito|credito|pix","categoria":"Alimentação|Transporte|Lazer|Contas|Outros","parcelas":1,"recorrente":false,"mesAno":"MM/YYYY"}
-REGRA IMPORTANTE:
-1. Se o usuário disser "por mês", "todo mês", "recorrente", etc (ex: "120 reais todo mês até dezembro"): marque "recorrente": true, e em "parcelas" coloque a quantidade de meses correspondente.
-2. Se for uma compra parcelada normal (ex: "parcelado em 3x"): marque "recorrente": false, e "parcelas": 3.
+  const prompt = `Você é um assistente financeiro. Extraia os dados da compra do texto.
+Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
+
+Formato OBRIGATÓRIO:
+{"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "mesAno":"MM/YYYY"}
+
+REGRAS MATEMÁTICAS (MUITO IMPORTANTE):
+- "valor_total" = o valor final pago por tudo.
+- "valor_parcela" = o valor de cada mensalidade (se for à vista, é igual ao total).
+- Ex 1 ("2x de 15 reais"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
+- Ex 2 ("30 reais em 2x"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
+- Ex 3 ("120 todo mês até dezembro" e hoje é Outubro): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3.
+  
 Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
 
   try {
@@ -842,40 +850,40 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     }
     parsed.tipo = normalizarTipo(parsed.tipo);
 
-    if(parsed.erro || !parsed.valor) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
+    if(parsed.erro || (!parsed.valor_parcela && !parsed.valor)) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
 
     if(parsed.mesAno === mesAtual) {
-      const isRecorrente = parsed.recorrente === true;
-      const parcelas = parsed.parcelas || 1;
       
-      let valorParcelado = parsed.valor;
-      let valorTotal = parsed.valor;
+      const parcelas = parsed.parcelas || 1;
+      const valorParcela = parsed.valor_parcela || parsed.valor || 0;
+      const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
 
-      // Logica Matemática Otimista para Parcelado vs Recorrente
-      if (parcelas > 1) {
-        if (isRecorrente) {
-          valorParcelado = parsed.valor;
-          valorTotal = parsed.valor * parcelas;
-        } else {
-          valorParcelado = parsed.valor / parcelas;
-          valorTotal = parsed.valor;
-        }
-      }
-
-      const novaTxn = { ...parsed, valor: valorParcelado, valorTotal: valorTotal, categoria: parsed.categoria || 'Outros', parcelaNum: 1, syncing: true };
+      const novaTxn = { 
+        ...parsed, 
+        valor: valorParcela, 
+        valorTotal: valorTotal, 
+        categoria: parsed.categoria || 'Outros', 
+        parcelaNum: 1, 
+        syncing: true 
+      };
+      
       txns.push(novaTxn);
       
       if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
       else renderizarTudo();
 
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcelado, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt}) })
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt}) })
       .then(() => { novaTxn.syncing = false; renderizarTudo(); localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); });
     } else {
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, user:userId, action:'save', mensagem:txt}) });
+      const parcelas = parsed.parcelas || 1;
+      const valorParcela = parsed.valor_parcela || parsed.valor || 0;
+      const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt}) });
     }
 
+    const valExibir = parsed.valor_parcela || parsed.valor || 0;
     const pm = parsed.parcelas>1 ? `, em <b>${parsed.parcelas}x</b>` : '';
-    setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(parsed.valor)}</b>${pm}.`);
+    setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(valExibir)}</b>${pm}.`);
 
   } catch(e) { 
     console.error("Erro interno capturado:", e);
