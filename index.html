@@ -387,7 +387,7 @@ let salarioBase = parseFloat(localStorage.getItem('finzap_salario_base')) || 0;
 let dataVisualizacao = new Date();
 let txns = [];
 let fil = 'todos';
-let fetchTimer = null; // Variável para controlar o debounce dos meses
+let fetchTimer = null;
 
 const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -397,7 +397,7 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catc
 
 let apiQueue = Promise.resolve();
 
-// Fila inteligente para requisições não se atropelarem (ex: apagar logo após salvar)
+// Fila inteligente para requisições não se atropelarem na nuvem
 function sendToAPI(payload) {
   const p = apiQueue.then(() => {
     return fetch(SHEETS_URL, {
@@ -852,13 +852,13 @@ Formato OBRIGATÓRIO:
 {"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "quantidade": 1, "mesAno":"MM/YYYY"}
 
 REGRAS MATEMÁTICAS (MUITO IMPORTANTE):
-- "valor_total" = o valor final pago por tudo.
-- "valor_parcela" = o valor de cada mensalidade (se for à vista, é igual ao total).
-- "quantidade" = quantas vezes ESSA MESMA COMPRA ocorreu NESTE MÊS (ex: "duas cobranças de 5 reais", quantidade = 2, parcelas = 1).
-- Ex 1 ("2x de 15 reais"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
-- Ex 2 ("30 reais em 2x"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
-- Ex 3 ("120 todo mês até dezembro" e estamos no mês 10): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3.
-- MÊS ATUAL: ${mesAtualNum}. Se o usuário disser "até o fim do ano", a quantidade de parcelas é EXATAMENTE (12 - ${mesAtualNum} + 1). Calcule com muita atenção!
+- "valor_total" = valor total pago por 1 (UMA) única compra.
+- "valor_parcela" = valor de cada mensalidade (se à vista, é igual ao total).
+- "quantidade" = número de vezes que a compra ocorreu. NÃO SOME os valores na quantidade. Exemplo: "duas cobranças de 5,91" -> valor_total = 5.91, valor_parcela = 5.91, quantidade = 2.
+- Ex 1 ("2x de 15 reais"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2, quantidade = 1.
+- Ex 2 ("30 reais em 2x"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2, quantidade = 1.
+- Ex 3 ("120 todo mês até dezembro" e estamos no mês 10): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3, quantidade = 1.
+- MÊS ATUAL: ${mesAtualNum}. Se o usuário disser "até o fim do ano", a quantidade de parcelas é EXATAMENTE (12 - ${mesAtualNum} + 1).
   
 Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
 
@@ -884,7 +884,6 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     const quantidade = parsed.quantidade || 1;
 
     for (let i = 0; i < quantidade; i++) {
-      // Adicionamos o "+ i" no ID para garantir exclusividade absoluta em caso de adições repetidas
       const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2) + i;
 
       const novaTxn = { 
