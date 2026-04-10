@@ -393,7 +393,23 @@ const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'O
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
-// ================= FUNÇÕES DE SISTEMA =================
+// ================= FUNÇÕES DE SISTEMA & FILA API =================
+
+let apiQueue = Promise.resolve();
+
+// Fila inteligente para requisições não se atropelarem (ex: apagar logo após salvar)
+function sendToAPI(payload) {
+  const p = apiQueue.then(() => {
+    return fetch(SHEETS_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    }).catch(e => console.error("API Error:", e));
+  });
+  apiQueue = p;
+  return p;
+}
+
 function parseDinheiro(val) {
   let str = String(val).trim();
   if (str.includes(',')) return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
@@ -571,7 +587,7 @@ function editBase() {
         localStorage.setItem('finzap_salario_base', salarioBase);
         renderizarTudo();
         toast("Salvando na nuvem...");
-        fetch(SHEETS_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'updateBase', user: userId, salarioBase: salarioBase }) }).then(() => toast("Salvo na nuvem!"));
+        sendToAPI({ action: 'updateBase', user: userId, salarioBase: salarioBase }).then(() => toast("Salvo na nuvem!"));
       }
     }
   });
@@ -597,7 +613,7 @@ function editExtra() {
         setRendaExtra(mesReq, num);
         renderizarTudo();
         toast("Salvando na nuvem...");
-        fetch(SHEETS_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({ action: 'updateExtra', user: userId, mesAno: mesReq, valor: num }) }).then(() => toast("Salvo na nuvem!"));
+        sendToAPI({ action: 'updateExtra', user: userId, mesAno: mesReq, valor: num }).then(() => toast("Salvo na nuvem!"));
       }
     }
   });
@@ -803,21 +819,17 @@ function processarExclusao(index, deleteAll) {
   localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
   renderizarTudo();
   
-  fetch(SHEETS_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify({ 
-      action: deleteAll ? 'delete_all' : 'delete', 
-      user: userId, 
-      mesAno: mesReq, 
-      produto: txnParaExcluir.produto, 
-      valor: txnParaExcluir.valor, 
-      valorTotal: txnParaExcluir.valorTotal || txnParaExcluir.valor, 
-      tipo: txnParaExcluir.tipo,
-      parcelas: txnParaExcluir.parcelas,
-      parcelaNum: txnParaExcluir.parcelaNum,
-      idTransacao: txnParaExcluir.idTransacao
-    })
+  sendToAPI({ 
+    action: deleteAll ? 'delete_all' : 'delete', 
+    user: userId, 
+    mesAno: mesReq, 
+    produto: txnParaExcluir.produto, 
+    valor: txnParaExcluir.valor, 
+    valorTotal: txnParaExcluir.valorTotal || txnParaExcluir.valor, 
+    tipo: txnParaExcluir.tipo,
+    parcelas: txnParaExcluir.parcelas,
+    parcelaNum: txnParaExcluir.parcelaNum,
+    idTransacao: txnParaExcluir.idTransacao
   }).then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
 }
 
@@ -837,11 +849,12 @@ async function processar(txt){
 Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
 
 Formato OBRIGATÓRIO:
-{"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "mesAno":"MM/YYYY"}
+{"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "quantidade": 1, "mesAno":"MM/YYYY"}
 
 REGRAS MATEMÁTICAS (MUITO IMPORTANTE):
 - "valor_total" = o valor final pago por tudo.
 - "valor_parcela" = o valor de cada mensalidade (se for à vista, é igual ao total).
+- "quantidade" = quantas vezes ESSA MESMA COMPRA ocorreu NESTE MÊS (ex: "duas cobranças de 5 reais", quantidade = 2, parcelas = 1).
 - Ex 1 ("2x de 15 reais"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
 - Ex 2 ("30 reais em 2x"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
 - Ex 3 ("120 todo mês até dezembro" e estamos no mês 10): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3.
@@ -865,14 +878,14 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
 
     if(parsed.erro || (!parsed.valor_parcela && !parsed.valor)) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
 
-    if(parsed.mesAno === mesAtual) {
-      
-      const parcelas = parsed.parcelas || 1;
-      const valorParcela = parsed.valor_parcela || parsed.valor || 0;
-      const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
-      
-      // Gera o ID único no momento em que a transação é criada pelo usuário
-      const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2);
+    const parcelas = parsed.parcelas || 1;
+    const valorParcela = parsed.valor_parcela || parsed.valor || 0;
+    const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
+    const quantidade = parsed.quantidade || 1;
+
+    for (let i = 0; i < quantidade; i++) {
+      // Adicionamos o "+ i" no ID para garantir exclusividade absoluta em caso de adições repetidas
+      const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2) + i;
 
       const novaTxn = { 
         ...parsed, 
@@ -884,24 +897,30 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
         idTransacao: idTx 
       };
       
-      txns.push(novaTxn);
+      if(parsed.mesAno === mesAtual) {
+        txns.push(novaTxn);
+      }
       
+      sendToAPI({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx})
+      .then(() => { 
+        if(parsed.mesAno === mesAtual) {
+          const target = txns.find(t => t.idTransacao === idTx);
+          if (target) target.syncing = false;
+          renderizarTudo(); 
+          localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); 
+        }
+      });
+    }
+
+    if(parsed.mesAno === mesAtual) {
       if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
       else renderizarTudo();
-
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx}) })
-      .then(() => { novaTxn.syncing = false; renderizarTudo(); localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); });
-    } else {
-      const parcelas = parsed.parcelas || 1;
-      const valorParcela = parsed.valor_parcela || parsed.valor || 0;
-      const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
-      const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2);
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx}) });
     }
 
     const valExibir = parsed.valor_parcela || parsed.valor || 0;
-    const pm = parsed.parcelas>1 ? `, em <b>${parsed.parcelas}x</b>` : '';
-    setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(valExibir)}</b>${pm}.`);
+    const pm = parcelas > 1 ? `, em <b>${parcelas}x</b>` : '';
+    const qm = quantidade > 1 ? ` (${quantidade}x nesse mês)` : '';
+    setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(valExibir)}</b>${pm}${qm}.`);
 
   } catch(e) { 
     console.error("Erro interno capturado:", e);
