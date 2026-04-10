@@ -1,9 +1,6 @@
 // api/claude.js — Vercel Serverless Function (CommonJS)
 
-// ESSENCIAL: força o Vercel a parsear o body como JSON
-module.exports.config = { api: { bodyParser: true } };
-
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -43,4 +40,9 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: 'Excecao: ' + err.message });
   }
-};
+}
+
+// Config DEVE ser definido DEPOIS da função e ANTES do module.exports
+handler.config = { api: { bodyParser: true } };
+
+module.exports = handler;
