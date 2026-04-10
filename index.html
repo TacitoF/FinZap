@@ -80,26 +80,26 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 .loading-state .dot:nth-child(3) { animation-delay:0.3s; }
 .loading-text { font-size:13px; color:var(--t3); letter-spacing:0.5px; }
 
-/* Transacoes */
+/* Transacoes (CORREÇÃO DE BUG VISUAL AQUI) */
 .txn{ background:var(--s1); border:1px solid var(--b1); border-radius:var(--rs); padding:11px 13px; margin-bottom:7px; display:flex; align-items:center; gap:11px; animation:up .22s ease; position:relative; overflow:hidden;}
-.txn.syncing { opacity: 0.6; }
+.txn.is-syncing { opacity: 0.6; border-style: dashed; pointer-events: none; }
 @keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .txn-ic{ width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .ic-bg-g{background:rgba(29,184,122,.1)} .ic-bg-r{background:rgba(240,64,96,.1)} .ic-bg-c{background:rgba(8,184,216,.1)}
 .txn-body{flex:1; min-width:0}
-.txn-name{font-size:13px; font-weight:500; color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position: relative; padding-right: 16px;}
+.txn-name{font-size:13px; font-weight:500; color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position: relative; padding-right: 20px;}
 .txn-sub{font-size:11px; color:var(--t2); margin-top:2px}
-.txn-right{text-align:right; flex-shrink:0; padding-right: 28px;}
+.txn-right{text-align:right; flex-shrink:0; padding-right: 32px;}
 .txn-val{font-family:'DM Mono',monospace; font-size:13px; font-weight:500;}
 .badges{display:flex; gap:4px; margin-top:4px; justify-content:flex-end}
 .bdg{font-size:10px; padding:2px 7px; border-radius:8px; font-weight:500}
 .bdg-g{background:rgba(29,184,122,.1); color:#5edda8} .bdg-r{background:rgba(240,64,96,.1); color:#f88898} .bdg-c{background:rgba(8,184,216,.1); color:#50d8f0} .bdg-a{background:rgba(232,160,32,.1); color:#f0c060} .bdg-cat{background:var(--b2); color:var(--t2)}
 
 /* Spinner de Sincronização SVG embutido */
-.spin-icon { width: 12px; height: 12px; animation: spin 1s linear infinite; color: var(--vi); position: absolute; right: 0; top: 2px; }
+.spin-icon { width: 14px; height: 14px; animation: spin 1s linear infinite; color: var(--vi); position: absolute; right: 0; top: 1px; }
 
 /* Botão Excluir */
-.btn-del { width: 30px; height: 100%; position: absolute; right: 0; top: 0; background: rgba(240,64,96,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #f88898; transition: 0.2s; }
+.btn-del { width: 34px; height: 100%; position: absolute; right: 0; top: 0; background: rgba(240,64,96,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #f88898; transition: 0.2s; }
 .btn-del:active { background: rgba(240,64,96,.3); }
 
 /* Dashboard (Resumo) */
@@ -331,7 +331,7 @@ textarea.inp:focus{border-color:var(--b3)}
         </div>
       </div>
       
-      <!-- Grade de 8 KPIs -->
+      <!-- Grade de KPIs -->
       <div class="kpi-grid">
         <div class="kpi-box"><div class="kpi-tit">Total Gasto</div><div class="kpi-val" id="kpi-gasto">R$ 0,00</div></div>
         <div class="kpi-box"><div class="kpi-tit">Gasto Médio</div><div class="kpi-val" id="kpi-ticket">R$ 0,00</div></div>
@@ -425,7 +425,6 @@ function showModal(opts) {
 
   const actions = document.getElementById('modal-actions-container');
   actions.innerHTML = '';
-  
   actions.className = (opts.customButtons && opts.customButtons.length > 2) ? 'modal-actions col' : 'modal-actions row';
 
   if (opts.customButtons) {
@@ -511,7 +510,7 @@ async function fazerLogin() {
       userId = user; userName = res.nome; salarioBase = parseFloat(res.salarioBase) || 0;
       localStorage.setItem('finzap_user', userId); localStorage.setItem('finzap_nome', userName); localStorage.setItem('finzap_salario_base', salarioBase);
       document.getElementById('login-screen').style.display = 'none'; document.getElementById('app').style.display = 'flex';
-      carregarDadosDaPlanilha();
+      checkIOS(); carregarDadosDaPlanilha();
     } else { showModal({title:"Atenção", desc:res.erro || "Erro ao entrar."}); }
   } catch(e) { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
   
@@ -538,7 +537,7 @@ async function fazerRegistro() {
       userId = user; userName = res.nome; salarioBase = parseFloat(res.salarioBase) || 0;
       localStorage.setItem('finzap_user', userId); localStorage.setItem('finzap_nome', userName); localStorage.setItem('finzap_salario_base', salarioBase);
       document.getElementById('register-screen').style.display = 'none'; document.getElementById('app').style.display = 'flex';
-      carregarDadosDaPlanilha();
+      checkIOS(); carregarDadosDaPlanilha();
     } else { showModal({title:"Atenção", desc:res.erro || "Erro ao criar conta."}); }
   } catch(e) { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
   
@@ -732,8 +731,9 @@ function renderizarTudo() {
       
       let spinIcon = t.syncing ? `<svg class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>` : '';
       
+      // O Bug era a classe "syncing" no elemento pai colidindo com o loader do cabecalho
       const el = document.createElement('div');
-      el.className = `txn ${t.syncing ? 'syncing' : ''}`;
+      el.className = `txn ${t.syncing ? 'is-syncing' : ''}`;
       const realIndex = txns.indexOf(t); 
       
       el.innerHTML=`
@@ -764,7 +764,7 @@ function excluirTxn(index) {
   if (txnParaExcluir.parcelas > 1) {
     showModal({
       title: "Excluir Parcelamento",
-      desc: `Esta compra (${txnParaExcluir.produto}) é parcelada em ${txnParaExcluir.parcelas}x.\nO que você deseja fazer?`,
+      desc: `Esta compra (${txnParaExcluir.produto}) é parcelada ou recorrente em ${txnParaExcluir.parcelas}x.\nO que você deseja fazer?`,
       customButtons: [
         { text: "Excluir Todas as Parcelas", class: "danger", onClick: () => processarExclusao(index, true) },
         { text: "Excluir Só Esta Parcela", class: "confirm", onClick: () => processarExclusao(index, false) },
@@ -787,7 +787,7 @@ function processarExclusao(index, deleteAll) {
   const mesReq = strMesAnoBackend(dataVisualizacao);
 
   if (deleteAll) {
-    invalidarCaches(); // Limpa memória para forçar atualização e sumir com parcelas futuras
+    invalidarCaches(); // Limpa cache para forçar os próximos meses a buscar versão sem parcelas
   }
   
   localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
@@ -795,7 +795,7 @@ function processarExclusao(index, deleteAll) {
   
   fetch(SHEETS_URL, {
     method: 'POST',
-    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // Sem No-Cors para enviar Payload de forma Segura
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
     body: JSON.stringify({ 
       action: deleteAll ? 'delete_all' : 'delete', 
       user: userId, 
@@ -821,7 +821,11 @@ async function processar(txt){
 
   const mesAtual = strMesAnoBackend(dataVisualizacao);
   const prompt = `Você é um assistente financeiro. Extraia os dados da compra.
-Responda APENAS JSON. Exemplo: {"produto":"nome","valor":123.45,"tipo":"debito|credito|pix","categoria":"Alimentação|Transporte|Lazer|Contas|Outros","parcelas":1,"mesAno":"MM/YYYY"}
+Responda APENAS JSON válido. 
+Exemplo Padrão: {"produto":"nome","valor":123.45,"tipo":"debito|credito|pix","categoria":"Alimentação|Transporte|Lazer|Contas|Outros","parcelas":1,"recorrente":false,"mesAno":"MM/YYYY"}
+REGRA IMPORTANTE:
+1. Se o usuário disser "por mês", "todo mês", "recorrente", etc (ex: "120 reais todo mês até dezembro"): marque "recorrente": true, e em "parcelas" coloque a quantidade de meses correspondente.
+2. Se for uma compra parcelada normal (ex: "parcelado em 3x"): marque "recorrente": false, e "parcelas": 3.
 Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
 
   try {
@@ -829,7 +833,6 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     const data = await r.json(); document.getElementById('dots').classList.remove('on');
     
     const raw = data.content?.[0]?.text || '{}';
-    
     const match = raw.match(/\{[\s\S]*\}/);
     const jsonStr = match ? match[0] : '{}';
     const parsed = JSON.parse(jsonStr);
@@ -842,14 +845,30 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     if(parsed.erro || !parsed.valor) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
 
     if(parsed.mesAno === mesAtual) {
-      const valorParcelado = parsed.parcelas > 1 ? (parsed.valor / parsed.parcelas) : parsed.valor;
-      const novaTxn = { ...parsed, valor: valorParcelado, valorTotal: parsed.valor, categoria: parsed.categoria || 'Outros', parcelaNum: 1, syncing: true };
+      const isRecorrente = parsed.recorrente === true;
+      const parcelas = parsed.parcelas || 1;
+      
+      let valorParcelado = parsed.valor;
+      let valorTotal = parsed.valor;
+
+      // Logica Matemática Otimista para Parcelado vs Recorrente
+      if (parcelas > 1) {
+        if (isRecorrente) {
+          valorParcelado = parsed.valor;
+          valorTotal = parsed.valor * parcelas;
+        } else {
+          valorParcelado = parsed.valor / parcelas;
+          valorTotal = parsed.valor;
+        }
+      }
+
+      const novaTxn = { ...parsed, valor: valorParcelado, valorTotal: valorTotal, categoria: parsed.categoria || 'Outros', parcelaNum: 1, syncing: true };
       txns.push(novaTxn);
       
       if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
       else renderizarTudo();
 
-      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, user:userId, action:'save', mensagem:txt}) })
+      fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, valor: valorParcelado, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt}) })
       .then(() => { novaTxn.syncing = false; renderizarTudo(); localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); });
     } else {
       fetch(SHEETS_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({...parsed, user:userId, action:'save', mensagem:txt}) });
