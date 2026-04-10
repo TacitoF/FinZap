@@ -649,7 +649,11 @@ async function carregarDadosDaPlanilha() {
   else { document.getElementById('txn-list').innerHTML=''; document.getElementById('loading-state').style.display='flex'; }
   
   document.getElementById('sync-icon').classList.add('on');
-  
+
+  // Aguarda todas as escritas pendentes (saves/deletes) terminarem
+  // antes de buscar dados frescos, evitando condição de corrida
+  try { await apiQueue; } catch(e) {}
+
   try {
     const r = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mesReq)}`);
     const data = await r.json();
@@ -661,7 +665,7 @@ async function carregarDadosDaPlanilha() {
       if(data.salarioBase !== undefined) { salarioBase = parseFloat(data.salarioBase) || 0; localStorage.setItem('finzap_salario_base', salarioBase); }
       if(data.rendaExtra !== undefined) { setRendaExtra(mesReq, parseFloat(data.rendaExtra) || 0); }
     }
-  } catch(e) {}
+  } catch(e) { console.error("Erro ao carregar planilha:", e); }
   
   document.getElementById('sync-icon').classList.remove('on');
   document.getElementById('loading-state').style.display = 'none';
@@ -812,15 +816,12 @@ function excluirTxn(index) {
 
 function processarExclusao(index, deleteAll) {
   const txnParaExcluir = txns[index];
+  txns.splice(index, 1);
   const mesReq = strMesAnoBackend(dataVisualizacao);
 
-  // Remove da UI imediatamente (otimista)
-  txns.splice(index, 1);
-
-  // Ao deletar TODAS as parcelas, invalida caches de todos os meses
-  // Ao deletar SÓ UMA parcela, invalida também os outros meses pois as
-  // parcelas restantes ainda existem e o cache deles pode estar desatualizado
-  invalidarCaches();
+  if (deleteAll) {
+    invalidarCaches(); 
+  }
   
   localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
   renderizarTudo();
@@ -835,25 +836,8 @@ function processarExclusao(index, deleteAll) {
     tipo: txnParaExcluir.tipo,
     parcelas: txnParaExcluir.parcelas,
     parcelaNum: txnParaExcluir.parcelaNum,
-    idTransacao: txnParaExcluir.idTransacao || ""
-  }).then(res => {
-    if (res && res.ok) {
-      toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!");
-      // Recarrega do servidor para garantir que a UI reflita o estado real da planilha
-      carregarDadosDaPlanilha();
-    } else {
-      // Rollback: devolve o item ao array e ao cache se a API falhou
-      txns.splice(index, 0, txnParaExcluir);
-      localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
-      renderizarTudo();
-      toast("Erro ao excluir da planilha. Tente novamente.", true);
-    }
-  }).catch(() => {
-    txns.splice(index, 0, txnParaExcluir);
-    localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
-    renderizarTudo();
-    toast("Erro de conexão ao excluir.", true);
-  });
+    idTransacao: txnParaExcluir.idTransacao
+  }).then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
 }
 
 // ================= IA E OTIMISTA =================
