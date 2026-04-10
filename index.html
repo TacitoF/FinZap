@@ -174,7 +174,7 @@ textarea.inp:focus{border-color:var(--b3)}
 .modal-btn.danger { background:rgba(240,64,96,.1); color:var(--re); border:1px solid rgba(240,64,96,.2); }
 .modal-btn:active { transform:scale(0.96); }
 
-/* iOS Install Prompt */
+/* iOS Install Prompt Melhorado - Exibido na Tela de Login */
 .ios-prompt { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); width:calc(100% - 32px); max-width:390px; background:var(--s1); border:1px solid var(--vi); border-radius:16px; padding:16px 20px; z-index:4000; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.5); animation:up 0.4s ease; }
 .ios-close { position:absolute; top:10px; right:10px; background:none; border:none; color:var(--t3); font-size:18px; cursor:pointer; padding:5px; }
 .ios-prompt p { font-size:15px; font-weight:500; color:var(--t1); margin-bottom:12px; padding-right:20px; }
@@ -397,15 +397,14 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catc
 
 let apiQueue = Promise.resolve();
 
-// Fila inteligente: Absolutamente TODOS os POSTs passam por aqui.
-// REMOVIDO: o mode 'no-cors'. Agora usamos requests normais que sincronizam PERFEITAMENTE a fila!
+// Fila inteligente COM KEEPALIVE: garante que as exclusões terminem mesmo se você fechar o app
 function sendToAPI(payload) {
   const p = apiQueue.then(() => {
     return fetch(SHEETS_URL, {
       method: 'POST',
-      // Sem no-cors: agora a Promise SÓ resolve quando a planilha devolver o JSON de sucesso
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      keepalive: true // MÁGICA: Protege a requisição de ser cancelada ao recarregar a página
     })
     .then(res => res.json()) 
     .catch(e => console.error("API Error:", e));
@@ -871,10 +870,13 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     const data = await r.json(); document.getElementById('dots').classList.remove('on');
     
     const raw = data.content?.[0]?.text || '{}';
+    
+    // 1. Regex à prova de falhas: extrai apenas o bloco entre as chaves { }
     const match = raw.match(/\{[\s\S]*\}/);
     const jsonStr = match ? match[0] : '{}';
     const parsed = JSON.parse(jsonStr);
 
+    // 2. Trava de segurança: se a IA inventar um tipo (ex: "dinheiro"), joga para "debito"
     if (parsed.tipo && !['debito', 'credito', 'pix'].includes(parsed.tipo)) {
       parsed.tipo = 'debito';
     }
