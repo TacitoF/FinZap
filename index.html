@@ -658,25 +658,10 @@ async function carregarDadosDaPlanilha() {
     const r = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mesReq)}`);
     const data = await r.json();
     if (data.ok && data.mes === mesReq) {
-      const novaLista = (data.transacoes || []).map(t => ({...t, tipo: normalizarTipo(t.tipo)}));
-      
-      // Proteção contra reload durante save pendente:
-      // Só substitui o cache se a planilha retornou dados, OU se não havia cache local.
-      // Isso evita que um reload apague itens que ainda estão sendo salvos no servidor.
-      const cacheAtual = localStorage.getItem(`cache_${userId}_${mesReq}`);
-      const listaAtual = cacheAtual ? JSON.parse(cacheAtual) : [];
-      
-      if (novaLista.length >= listaAtual.length) {
-        // Planilha tem dados iguais ou mais — usa a planilha (fonte da verdade)
-        txns = novaLista;
-      } else {
-        // Planilha tem MENOS dados que o cache — provável save ainda pendente.
-        // Mescla: mantém itens do cache que ainda não chegaram na planilha.
-        const idsNaPlanilha = new Set(novaLista.map(t => t.idTransacao).filter(Boolean));
-        const pendentes = listaAtual.filter(t => t.idTransacao && !idsNaPlanilha.has(t.idTransacao));
-        txns = [...novaLista, ...pendentes.map(t => ({...t, syncing: true}))];
-      }
-      
+      // Planilha é sempre a fonte da verdade após o fetch.
+      // O cache otimista (syncing:true) só é exibido no intervalo entre o input do usuário
+      // e a resposta da planilha — depois disso, a planilha manda.
+      txns = (data.transacoes || []).map(t => ({...t, tipo: normalizarTipo(t.tipo), syncing: false}));
       localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
       
       if(data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
@@ -932,6 +917,8 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
       }
 
       // Pré-cacheia as parcelas futuras nos meses corretos para navegação imediata
+      // IMPORTANTE: syncing:false nas parcelas futuras — o spinner só existe no mês atual.
+      // A parcela futura já estará confirmada na planilha quando o usuário navegar até lá.
       if (parcelas > 1) {
         const [mesBaseNum, anoBaseNum] = parsed.mesAno.split('/').map(Number);
         for (let p = 1; p < parcelas; p++) {
@@ -950,7 +937,7 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
               parcelaNum: p + 1,
               mesAno: mesFuturo,
               data: '01/' + mesFuturo,
-              syncing: true,
+              syncing: false,
               idTransacao: idTx
             });
             localStorage.setItem(cacheKey, JSON.stringify(listaFutura));
