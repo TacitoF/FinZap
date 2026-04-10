@@ -1,4 +1,5 @@
 // api/claude.js — Vercel Serverless Function (CommonJS)
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -11,7 +12,13 @@ module.exports = async function handler(req, res) {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'API key nao configurada.' });
 
   try {
-    const { system, messages, model, max_tokens } = req.body;
+    // Parse manual do body caso não venha parsed automaticamente
+    let body = req.body;
+    if (typeof body === 'string') {
+      body = JSON.parse(body);
+    }
+
+    const { system, messages, model, max_tokens } = body;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -21,7 +28,7 @@ module.exports = async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: model || 'claude-3-5-haiku-20241022',
+        model: model || 'claude-haiku-4-5-20251001',
         max_tokens: max_tokens || 300,
         system,
         messages,
