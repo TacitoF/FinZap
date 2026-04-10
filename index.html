@@ -658,7 +658,25 @@ async function carregarDadosDaPlanilha() {
     const r = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mesReq)}`);
     const data = await r.json();
     if (data.ok && data.mes === mesReq) {
-      txns = (data.transacoes || []).map(t => ({...t, tipo: normalizarTipo(t.tipo)}));
+      const novaLista = (data.transacoes || []).map(t => ({...t, tipo: normalizarTipo(t.tipo)}));
+      
+      // Proteção contra reload durante save pendente:
+      // Só substitui o cache se a planilha retornou dados, OU se não havia cache local.
+      // Isso evita que um reload apague itens que ainda estão sendo salvos no servidor.
+      const cacheAtual = localStorage.getItem(`cache_${userId}_${mesReq}`);
+      const listaAtual = cacheAtual ? JSON.parse(cacheAtual) : [];
+      
+      if (novaLista.length >= listaAtual.length) {
+        // Planilha tem dados iguais ou mais — usa a planilha (fonte da verdade)
+        txns = novaLista;
+      } else {
+        // Planilha tem MENOS dados que o cache — provável save ainda pendente.
+        // Mescla: mantém itens do cache que ainda não chegaram na planilha.
+        const idsNaPlanilha = new Set(novaLista.map(t => t.idTransacao).filter(Boolean));
+        const pendentes = listaAtual.filter(t => t.idTransacao && !idsNaPlanilha.has(t.idTransacao));
+        txns = [...novaLista, ...pendentes.map(t => ({...t, syncing: true}))];
+      }
+      
       localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
       
       if(data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
@@ -906,8 +924,38 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
         idTransacao: idTx 
       };
       
+      // Adiciona a parcela 1 na UI do mês atual imediatamente (otimista)
       if(parsed.mesAno === mesAtual) {
         txns.push(novaTxn);
+        // Salva o cache AGORA (antes do sendToAPI) para sobreviver a recarregamentos
+        localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns));
+      }
+
+      // Pré-cacheia as parcelas futuras nos meses corretos para navegação imediata
+      if (parcelas > 1) {
+        const [mesBaseNum, anoBaseNum] = parsed.mesAno.split('/').map(Number);
+        for (let p = 1; p < parcelas; p++) {
+          const d = new Date(anoBaseNum, mesBaseNum - 1 + p, 1);
+          const mesFuturo = String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+          const cacheKey = `cache_${userId}_${mesFuturo}`;
+          const cacheExistente = localStorage.getItem(cacheKey);
+          const listaFutura = cacheExistente ? JSON.parse(cacheExistente) : [];
+          // Evita duplicar se já estiver no cache
+          if (!listaFutura.find(t => t.idTransacao === idTx)) {
+            listaFutura.push({
+              ...parsed,
+              valor: valorParcela,
+              valorTotal: valorTotal,
+              categoria: parsed.categoria || 'Outros',
+              parcelaNum: p + 1,
+              mesAno: mesFuturo,
+              data: '01/' + mesFuturo,
+              syncing: true,
+              idTransacao: idTx
+            });
+            localStorage.setItem(cacheKey, JSON.stringify(listaFutura));
+          }
+        }
       }
       
       // Envio para a Fila Única (A nuvem processa na ordem correta, sem atropelos)
@@ -917,7 +965,22 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
           const target = txns.find(t => t.idTransacao === idTx);
           if (target) target.syncing = false;
           renderizarTudo(); 
-          localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns)); 
+          localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns));
+        }
+        // Marca syncing=false nos caches de parcelas futuras
+        if (parcelas > 1) {
+          const [mesBaseNum, anoBaseNum] = parsed.mesAno.split('/').map(Number);
+          for (let p = 1; p < parcelas; p++) {
+            const d = new Date(anoBaseNum, mesBaseNum - 1 + p, 1);
+            const mesFuturo = String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+            const cacheKey = `cache_${userId}_${mesFuturo}`;
+            const lista = localStorage.getItem(cacheKey);
+            if (lista) {
+              const arr = JSON.parse(lista);
+              const t = arr.find(t => t.idTransacao === idTx);
+              if (t) { t.syncing = false; localStorage.setItem(cacheKey, JSON.stringify(arr)); }
+            }
+          }
         }
       });
     }
