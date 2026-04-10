@@ -172,16 +172,6 @@ html,body{
 .dot:nth-child(3){animation-delay:.28s}
 @keyframes bnc{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(-5px);opacity:1}}
 
-.rec-row{display:none;align-items:center;gap:6px;padding:7px 13px}
-.rec-row.on{display:flex}
-.rec-label{font-size:12px;color:var(--re);font-weight:500}
-.wv{width:3px;border-radius:2px;background:var(--re);animation:wv .75s ease-in-out infinite}
-.wv:nth-child(2){animation-delay:.08s}
-.wv:nth-child(3){animation-delay:.16s}
-.wv:nth-child(4){animation-delay:.24s}
-.wv:nth-child(5){animation-delay:.32s}
-@keyframes wv{0%,100%{height:3px;opacity:.3}50%{height:16px;opacity:1}}
-
 /* Input */
 .input-row{
   display:flex;gap:7px;align-items:flex-end;
@@ -201,9 +191,6 @@ textarea.inp:focus{border-color:var(--b3)}
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;flex-shrink:0;transition:all .18s;
 }
-.btn-mic{background:var(--s2);border:1px solid var(--b1)}
-.btn-mic.rec{background:rgba(240,64,96,.12);border-color:rgba(240,64,96,.3);animation:pulse .9s infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 .btn-send{background:var(--vi2)}
 .btn-send:active{transform:scale(.93)}
 
@@ -296,14 +283,6 @@ textarea.inp:focus{border-color:var(--b3)}
     <div class="bubble" id="ai-bubble">
       Oi! Sou o <b>Finzap</b>. Me conta sua compra — pode digitar ou gravar.
     </div>
-    <div class="rec-row" id="rec-row">
-      <div class="rec-label">Gravando</div>
-      <div class="wv" style="height:5px"></div>
-      <div class="wv" style="height:12px"></div>
-      <div class="wv" style="height:7px"></div>
-      <div class="wv" style="height:15px"></div>
-      <div class="wv" style="height:9px"></div>
-    </div>
     <div class="dots" id="dots">
       <div class="dot"></div><div class="dot"></div><div class="dot"></div>
     </div>
@@ -312,18 +291,6 @@ textarea.inp:focus{border-color:var(--b3)}
   <!-- Input -->
   <div class="input-row">
     <textarea class="inp" id="msg" placeholder='Ex: "200 no débito no mercado"' rows="1"></textarea>
-
-    <button class="btn btn-mic" id="btn-mic" aria-label="Gravar áudio">
-      <svg id="ic-mic" width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <rect x="7" y="2" width="6" height="9" rx="3" stroke="#9090b0" stroke-width="1.5" fill="none"/>
-        <path d="M4 10a6 6 0 0012 0" stroke="#9090b0" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-        <line x1="10" y1="16" x2="10" y2="18.5" stroke="#9090b0" stroke-width="1.5" stroke-linecap="round"/>
-        <line x1="7" y1="18.5" x2="13" y2="18.5" stroke="#9090b0" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      <svg id="ic-stop" width="20" height="20" viewBox="0 0 20 20" fill="none" style="display:none">
-        <rect x="5.5" y="5.5" width="9" height="9" rx="2" fill="#f04060"/>
-      </svg>
-    </button>
 
     <button class="btn btn-send" id="btn-send" aria-label="Enviar">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -344,6 +311,7 @@ textarea.inp:focus{border-color:var(--b3)}
 <script>
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 const SHEETS_URL   = "https://script.google.com/macros/s/AKfycbxTTSsjsXUWidIsRUcRQGKLiHgYCALPex7fyXVY_e2ttVTwAjNHKvRb_tPYaIFjnPJWAg/exec";
+const CLAUDE_URL   = "/api/claude";   // proxy seguro — chave fica no servidor
 
 const SYS = `Você é um assistente financeiro. Analise a mensagem e extraia os dados da compra.
 Responda APENAS com JSON válido, sem markdown, sem explicação, no formato:
@@ -448,13 +416,13 @@ async function processar(txt){
   const ub = document.createElement('div');
   ub.className='bubble bubble-user';
   ub.textContent=txt;
-  w.insertBefore(ub, document.getElementById('rec-row'));
+  w.appendChild(ub);
   setTimeout(()=>ub.remove(),6000);
 
   document.getElementById('dots').classList.add('on');
 
   try{
-    const r = await fetch('https://api.anthropic.com/v1/messages',{
+    const r = await fetch(CLAUDE_URL,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -528,59 +496,7 @@ document.querySelectorAll('.tab').forEach(t=>{
   });
 });
 
-let mr=null,chunks=[],rec=false;
-
-document.getElementById('btn-mic').addEventListener('click',async()=>{
-  const btn    = document.getElementById('btn-mic');
-  const icMic  = document.getElementById('ic-mic');
-  const icStop = document.getElementById('ic-stop');
-  const recRow = document.getElementById('rec-row');
-  const msgEl  = document.getElementById('msg');
-
-  if(!rec){
-    try{
-      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-      chunks=[];
-      mr=new MediaRecorder(stream);
-      mr.ondataavailable=e=>chunks.push(e.data);
-      mr.onstop=async()=>{
-        stream.getTracks().forEach(t=>t.stop());
-        recRow.classList.remove('on');
-        icMic.style.display=''; icStop.style.display='none';
-        btn.classList.remove('rec'); rec=false;
-
-        const blob=new Blob(chunks,{type:'audio/webm'});
-        msgEl.value='Transcrevendo...'; msgEl.disabled=true;
-        try{
-          const fd=new FormData();
-          fd.append('file',blob,'audio.webm');
-          fd.append('model','whisper-1');
-          fd.append('language','pt');
-          const wr=await fetch('https://api.openai.com/v1/audio/transcriptions',{
-            method:'POST',
-            headers:{'Authorization':'Bearer YOUR_OPENAI_KEY'},
-            body:fd
-          });
-          const wd=await wr.json();
-          const tr=wd.text||'';
-          msgEl.value=tr; msgEl.disabled=false;
-          if(tr) processar(tr);
-        }catch(e){
-          msgEl.value=''; msgEl.disabled=false;
-          toast('Erro na transcrição. Tente digitar.',true);
-        }
-      };
-      mr.start(); rec=true;
-      icMic.style.display='none'; icStop.style.display='';
-      btn.classList.add('rec');
-      recRow.classList.add('on');
-    }catch(e){
-      toast('Permita acesso ao microfone.',true);
-    }
-  }else{
-    mr.stop();
-  }
-});
+// fim
 </script>
 </body>
 </html>
