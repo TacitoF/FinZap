@@ -1,12 +1,4 @@
 {
-  "functions": {
-    "api/claude.js": {
-      "runtime": "nodejs20.x"
-    },
-    "api/whisper.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "headers": [
     {
       "source": "/sw.js",
