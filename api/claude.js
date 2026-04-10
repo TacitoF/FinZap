@@ -18,7 +18,8 @@ async function handler(req, res) {
 
     const system     = body.system;
     const messages   = body.messages;
-    const model      = body.model      || 'claude-haiku-4-5-20251001';
+    // Fallback ajustado para o modelo oficial do Claude 3.5 Haiku
+    const model      = body.model      || 'claude-3-5-haiku-20241022';
     const max_tokens = body.max_tokens || 300;
 
     if (!messages) return res.status(400).json({ error: 'Campo messages ausente' });
