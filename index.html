@@ -832,8 +832,14 @@ function processarExclusao(index, deleteAll) {
     tipo: txnParaExcluir.tipo,
     parcelas: txnParaExcluir.parcelas,
     parcelaNum: txnParaExcluir.parcelaNum,
-    idTransacao: txnParaExcluir.idTransacao
-  }).then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
+    idTransacao: txnParaExcluir.idTransacao || ""
+  }).then(res => {
+    if (res && res.ok) {
+      toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!");
+    } else {
+      toast("Erro ao excluir da planilha. Tente novamente.", true);
+    }
+  }).catch(() => toast("Erro de conexão ao excluir.", true));
 }
 
 // ================= IA E OTIMISTA =================
