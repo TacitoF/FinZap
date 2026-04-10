@@ -32,7 +32,7 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 .hdr-wordmark{ font-family:'DM Mono',monospace; font-size:18px; font-weight:500; letter-spacing:-0.3px;}
 .hdr-wordmark span{color:var(--vi)}
 .hdr-nav{ display:flex; align-items:center; background:rgba(91,94,244,.1); border-radius:24px; border:1px solid rgba(91,94,244,.22); overflow:hidden; }
-.nav-btn{ background:none; border:none; color:var(--vi); padding:12px 18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.nav-btn{ background:none; border:none; color:var(--vi); padding:12px 18px; cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:manipulation; outline:none; }
 .nav-btn svg { width:14px; height:14px; }
 .nav-btn:active{background:rgba(91,94,244,.25)}
 .hdr-month{ font-family:'DM Mono',monospace; font-size:12px; color:var(--vi); padding:0 4px; font-weight:500; min-width:70px; text-align:center; text-transform: uppercase; }
@@ -82,7 +82,7 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 
 /* Transacoes */
 .txn{ background:var(--s1); border:1px solid var(--b1); border-radius:var(--rs); padding:11px 13px; margin-bottom:7px; display:flex; align-items:center; gap:11px; animation:up .22s ease; position:relative; overflow:hidden;}
-.txn.is-syncing { opacity: 0.6; }
+.txn.is-syncing { opacity: 0.6; pointer-events: none; border-style: dashed; }
 @keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .txn-ic{ width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .ic-bg-g{background:rgba(29,184,122,.1)} .ic-bg-r{background:rgba(240,64,96,.1)} .ic-bg-c{background:rgba(8,184,216,.1)}
@@ -219,7 +219,7 @@ textarea.inp:focus{border-color:var(--b3)}
   <div class="log-box">
     <div>
       <label>Usuário (@)</label>
-      <input type="text" id="log-user" class="log-input" placeholder="Insira seu User" autocomplete="off">
+      <input type="text" id="log-user" class="log-input" placeholder="Ex: tacito" autocomplete="off">
     </div>
     <div>
       <label>Senha</label>
@@ -243,7 +243,7 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
     <div>
       <label>Nome de Usuário (@ único)</label>
-      <input type="text" id="reg-user" class="log-input" placeholder="Insira seu User" autocomplete="off">
+      <input type="text" id="reg-user" class="log-input" placeholder="Ex: tacito" autocomplete="off">
     </div>
     <div>
       <label>Senha</label>
@@ -272,9 +272,9 @@ textarea.inp:focus{border-color:var(--b3)}
       <div class="hdr-wordmark">fin<span>zap</span></div>
     </div>
     <div class="hdr-nav">
-      <button class="nav-btn" onclick="mudarMes(-1)" aria-label="Mês Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+      <button type="button" class="nav-btn" onclick="mudarMes(-1)" aria-label="Mês Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
       <div class="hdr-month" id="cur-month">---/----</div>
-      <button class="nav-btn" onclick="mudarMes(1)" aria-label="Próximo Mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+      <button type="button" class="nav-btn" onclick="mudarMes(1)" aria-label="Próximo Mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
     </div>
   </div>
 
@@ -387,6 +387,7 @@ let salarioBase = parseFloat(localStorage.getItem('finzap_salario_base')) || 0;
 let dataVisualizacao = new Date();
 let txns = [];
 let fil = 'todos';
+let fetchTimer = null; // Variável para controlar o debounce dos meses
 
 const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -602,10 +603,22 @@ function editExtra() {
   });
 }
 
-// ================= NAVEGAÇÃO E SYNC =================
+// ================= NAVEGAÇÃO E SYNC COM DEBOUNCE =================
 function mudarMes(offset) {
+  // Muda o mês na memória e na UI instantaneamente
   dataVisualizacao.setMonth(dataVisualizacao.getMonth() + offset);
-  carregarDadosDaPlanilha();
+  document.getElementById('cur-month').textContent = strMesAnoVisual(dataVisualizacao);
+  
+  // Limpa a tela para dar UX de transição
+  document.getElementById('txn-list').innerHTML=''; 
+  document.getElementById('loading-state').style.display='flex';
+  document.getElementById('empty').style.display='none';
+  
+  // Debounce: Só busca os dados 350ms depois que o usuário parar de clicar
+  clearTimeout(fetchTimer);
+  fetchTimer = setTimeout(() => {
+    carregarDadosDaPlanilha();
+  }, 350);
 }
 
 async function carregarDadosDaPlanilha() {
@@ -712,7 +725,7 @@ function renderizarTudo() {
   if (fil !== 'resumo' && fil !== 'config') {
     const vis = fil === 'todos' ? txns : txns.filter(t => t.tipo === fil);
     list.innerHTML=''; 
-    if(!vis.length) { list.style.display = 'none'; empty.style.display = 'flex'; return; }
+    if(!vis.length) { list.style.display = 'none'; empty.style.display = 'flex'; document.getElementById('loading-state').style.display='none'; return; }
     
     empty.style.display = 'none'; list.style.display = 'block';
 
@@ -821,6 +834,8 @@ async function processar(txt){
   document.getElementById('dots').classList.add('on');
 
   const mesAtual = strMesAnoBackend(dataVisualizacao);
+  const mesAtualNum = dataVisualizacao.getMonth() + 1; // Pega o número real do mês atual (1 a 12)
+  
   const prompt = `Você é um assistente financeiro. Extraia os dados da compra do texto.
 Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
 
@@ -832,7 +847,8 @@ REGRAS MATEMÁTICAS (MUITO IMPORTANTE):
 - "valor_parcela" = o valor de cada mensalidade (se for à vista, é igual ao total).
 - Ex 1 ("2x de 15 reais"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
 - Ex 2 ("30 reais em 2x"): valor_total = 30.00, valor_parcela = 15.00, parcelas = 2.
-- Ex 3 ("120 todo mês até dezembro" e hoje é Outubro): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3.
+- Ex 3 ("120 todo mês até dezembro" e estamos no mês 10): valor_total = 360.00, valor_parcela = 120.00, parcelas = 3.
+- MÊS ATUAL: ${mesAtualNum}. Se o usuário disser "até o fim do ano", a quantidade de parcelas é EXATAMENTE (12 - ${mesAtualNum} + 1). Calcule com muita atenção!
   
 Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
 
