@@ -815,8 +815,20 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     const r = await fetch(CLAUDE_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ model:CLAUDE_MODEL, max_tokens:300, system:prompt, messages:[{role:'user', content:txt}] }) });
     const data = await r.json(); document.getElementById('dots').classList.remove('on');
     
-    const parsed = JSON.parse((data.content?.[0]?.text || '{}').match(/\{[\s\S]*\}/)?.[0] || '{}');
+    const raw = data.content?.[0]?.text || '{}';
+    
+    // 1. Regex à prova de falhas: extrai apenas o bloco entre as chaves { }
+    const match = raw.match(/\{[\s\S]*\}/);
+    const jsonStr = match ? match[0] : '{}';
+    const parsed = JSON.parse(jsonStr);
+
+    // 2. Trava de segurança: se a IA inventar um tipo (ex: "dinheiro"), joga para "debito"
+    if (parsed.tipo && !['debito', 'credito', 'pix'].includes(parsed.tipo)) {
+      parsed.tipo = 'debito';
+    }
+    // Aplica também a normalização para remover acentos e espaços
     parsed.tipo = normalizarTipo(parsed.tipo);
+
     if(parsed.erro || !parsed.valor) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
 
     if(parsed.mesAno === mesAtual) {
@@ -836,7 +848,11 @@ Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
     const pm = parsed.parcelas>1 ? `, em <b>${parsed.parcelas}x</b>` : '';
     setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(parsed.valor)}</b>${pm}.`);
 
-  }catch(e){ document.getElementById('dots').classList.remove('on'); setBubble('Erro ao processar. Tente novamente.'); }
+  } catch(e) { 
+    console.error("Erro interno capturado:", e);
+    document.getElementById('dots').classList.remove('on'); 
+    setBubble('Erro ao processar. Verifique sua conexão.'); 
+  }
 }
 
 document.getElementById('btn-send').onclick = () => { const m = document.getElementById('msg'); if(m.value) { processar(m.value); m.value=''; m.style.height=''; }};
