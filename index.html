@@ -404,10 +404,14 @@ function sendToAPI(payload) {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify(payload),
-      keepalive: true // MÁGICA: Protege a requisição de ser cancelada ao recarregar a página
+      keepalive: true // Protege a requisição de ser cancelada ao recarregar a página
     })
-    .then(res => res.json()) 
-    .catch(e => console.error("API Error:", e));
+    .then(res => res.text())
+    .then(text => {
+      try { return JSON.parse(text); } 
+      catch(e) { console.error("sendToAPI resposta inválida:", text.substring(0,200)); return { ok: false }; }
+    })
+    .catch(e => { console.error("API Error:", e); return { ok: false }; }); // Nunca rejeita — evita travar a fila
   });
   apiQueue = p;
   return p;
@@ -650,23 +654,28 @@ async function carregarDadosDaPlanilha() {
   
   document.getElementById('sync-icon').classList.add('on');
 
-  // Aguarda todas as escritas pendentes (saves/deletes) terminarem
-  // antes de buscar dados frescos, evitando condição de corrida
-  try { await apiQueue; } catch(e) {}
+  // Aguarda escritas pendentes com timeout de 8s para não bloquear o carregamento
+  try { await Promise.race([apiQueue, new Promise(r => setTimeout(r, 8000))]); } catch(e) {}
 
   try {
     const r = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mesReq)}`);
-    const data = await r.json();
-    if (data.ok && data.mes === mesReq) {
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch(je) {
+      console.error("Resposta inválida da planilha:", text.substring(0, 200));
+      data = { ok: false };
+    }
+    // Compara trimando espaços para evitar falha por encoding sutil
+    if (data.ok && String(data.mes || "").trim() === mesReq.trim()) {
       // Planilha é sempre a fonte da verdade após o fetch.
-      // O cache otimista (syncing:true) só é exibido no intervalo entre o input do usuário
-      // e a resposta da planilha — depois disso, a planilha manda.
       txns = (data.transacoes || []).map(t => ({...t, tipo: normalizarTipo(t.tipo), syncing: false}));
       localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
       
       if(data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
       if(data.salarioBase !== undefined) { salarioBase = parseFloat(data.salarioBase) || 0; localStorage.setItem('finzap_salario_base', salarioBase); }
       if(data.rendaExtra !== undefined) { setRendaExtra(mesReq, parseFloat(data.rendaExtra) || 0); }
+    } else if (!data.ok) {
+      console.error("Planilha retornou erro:", data.erro || JSON.stringify(data));
     }
   } catch(e) { console.error("Erro ao carregar planilha:", e); }
   

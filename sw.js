@@ -1,4 +1,4 @@
-const CACHE = "finzap-v11";
+const CACHE = "finzap-v12";
 const ASSETS = ["/", "/index.html", "/manifest.json"];
 
 self.addEventListener("install", e => {
