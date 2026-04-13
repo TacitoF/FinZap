@@ -377,642 +377,778 @@ textarea.inp:focus{border-color:var(--b3)}
 <div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg><span id="toast-msg"></span></div>
 
 <script>
+// ================================================================
+//  FINZAP — Frontend v13 (Queue-First Architecture)
+//  Princípios:
+//  1. Estado local é a fonte da verdade durante a sessão
+//  2. Fila de operações garante ordem e nunca perde ações
+//  3. Cache nunca é sobrescrito enquanto há ops pendentes p/ aquele mês
+//  4. Spinner controlado pelo status da op na fila, não pelo fetch
+// ================================================================
+
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const SHEETS_URL   = "https://script.google.com/macros/s/AKfycbxTTSsjsXUWidIsRUcRQGKLiHgYCALPex7fyXVY_e2ttVTwAjNHKvRb_tPYaIFjnPJWAg/exec";
 const CLAUDE_URL   = "/api/claude";
 
-let userId = localStorage.getItem('finzap_user') || "";
-let userName = localStorage.getItem('finzap_nome') || userId;
+// ── Variáveis globais de sessão ──────────────────────────────────
+let userId   = localStorage.getItem('finzap_user') || "";
+let userName = localStorage.getItem('finzap_nome') || "";
 let salarioBase = parseFloat(localStorage.getItem('finzap_salario_base')) || 0;
 let dataVisualizacao = new Date();
-let txns = [];
-let fil = 'todos';
+let txns = [];          // estado do mês exibido
+let fil  = 'todos';
 let fetchTimer = null;
 
-const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
-// ================= FUNÇÕES DE SISTEMA & FILA API =================
+// ================================================================
+//  SISTEMA DE FILA DE OPERAÇÕES
+//  Cada operação tem: { id, tipo, payload, mesAfetados[], status }
+//  Status: 'pending' | 'done' | 'error'
+// ================================================================
 
-let apiQueue = Promise.resolve();
+const QUEUE_KEY = () => `finzap_queue_${userId}`;
 
-// Fila inteligente COM KEEPALIVE: garante que as exclusões terminem mesmo se você fechar o app
-function sendToAPI(payload) {
-  const p = apiQueue.then(() => {
-    return fetch(SHEETS_URL, {
+function carregarFila() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY()) || '[]'); }
+  catch { return []; }
+}
+function salvarFila(fila) {
+  localStorage.setItem(QUEUE_KEY(), JSON.stringify(fila));
+}
+function addFila(op) {
+  const fila = carregarFila();
+  fila.push({ ...op, id: op.id || gerarId(), status: 'pending' });
+  salvarFila(fila);
+}
+function marcarDone(opId) {
+  const fila = carregarFila();
+  const idx = fila.findIndex(o => o.id === opId);
+  if (idx !== -1) { fila[idx].status = 'done'; salvarFila(fila); }
+  limparFilaDone();
+}
+function limparFilaDone() {
+  // Mantém apenas ops pending (as done já foram processadas)
+  const fila = carregarFila().filter(o => o.status !== 'done');
+  salvarFila(fila);
+}
+function mesPossuiOpPendente(mesStr) {
+  return carregarFila().some(o => o.status === 'pending' && (o.mesesAfetados || []).includes(mesStr));
+}
+
+// ── Promise chain serial (garante ordem de execução) ──────────────
+let _chainPromise = Promise.resolve();
+function enfileirarExecucao(fn) {
+  _chainPromise = _chainPromise.then(() => fn()).catch(e => console.error('Fila erro:', e));
+  return _chainPromise;
+}
+
+// ── Executa uma operação da fila contra a API Sheets ──────────────
+function executarOpAPI(op) {
+  return enfileirarExecucao(() =>
+    fetch(SHEETS_URL, {
       method: 'POST',
-      headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify(payload),
-      keepalive: true // Protege a requisição de ser cancelada ao recarregar a página
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(op.payload),
+      keepalive: true
     })
-    .then(res => res.text())
-    .then(text => {
-      try { return JSON.parse(text); } 
-      catch(e) { console.error("sendToAPI resposta inválida:", text.substring(0,200)); return { ok: false }; }
+    .then(r => r.text())
+    .then(txt => {
+      try { return JSON.parse(txt); } catch { return { ok: false }; }
     })
-    .catch(e => { console.error("API Error:", e); return { ok: false }; }); // Nunca rejeita — evita travar a fila
+    .then(res => {
+      marcarDone(op.id);
+      return res;
+    })
+    .catch(e => {
+      console.error('Erro op API:', e);
+      marcarDone(op.id); // marca done mesmo em erro para não bloquear para sempre
+      return { ok: false };
+    })
+  );
+}
+
+// ================================================================
+//  CACHE POR MÊS
+// ================================================================
+function cacheKey(mesStr) { return `cache_${userId}_${mesStr}`; }
+function lerCache(mesStr) {
+  try { return JSON.parse(localStorage.getItem(cacheKey(mesStr)) || 'null'); }
+  catch { return null; }
+}
+function salvarCache(mesStr, lista) {
+  localStorage.setItem(cacheKey(mesStr), JSON.stringify(lista));
+}
+function limparTodosOsCaches() {
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith(`cache_${userId}_`)) localStorage.removeItem(k);
   });
-  apiQueue = p;
-  return p;
 }
 
+// ================================================================
+//  UTILITÁRIOS
+// ================================================================
+function gerarId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function parseDinheiro(val) {
-  let str = String(val).trim();
-  if (str.includes(',')) return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
-  return parseFloat(str) || 0;
+  const s = String(val).trim();
+  return s.includes(',') ? parseFloat(s.replace(/\./g,'').replace(',','.')) || 0 : parseFloat(s) || 0;
 }
-function strMesAnoBackend(d) { return String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear(); }
-function strMesAnoVisual(d) { return MESES[d.getMonth()] + '/' + d.getFullYear(); }
-function fmt(v){ return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-function normalizarTipo(tipo) {
-  let t = String(tipo||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  return ['debito', 'credito', 'pix'].includes(t) ? t : 'debito';
+function strMesBackend(d) { return String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+function strMesVisual(d)  { return MESES[d.getMonth()]+'/'+d.getFullYear(); }
+function fmt(v) { return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function normTipo(t) {
+  const s = String(t||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,'').trim();
+  return ['debito','credito','pix'].includes(s) ? s : 'debito';
 }
-function invalidarCaches() {
-  const keys = Object.keys(localStorage);
-  keys.forEach(k => { if(k.startsWith(`cache_${userId}_`)) localStorage.removeItem(k); });
+function mesOffset(mesStr, offset) {
+  // retorna mesStr deslocado por `offset` meses. ex: "04/2025" + 1 = "05/2025"
+  const [m, a] = mesStr.split('/').map(Number);
+  const d = new Date(a, m - 1 + offset, 1);
+  return String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
 }
+function getRendaExtra(mes) { return parseFloat(localStorage.getItem(`finzap_extra_${userId}_${mes}`)) || 0; }
+function setRendaExtra(mes, v) { localStorage.setItem(`finzap_extra_${userId}_${mes}`, v); }
 
-// ================= MODAIS PERSONALIZADOS =================
-let modalCallback = null;
-
+// ================================================================
+//  MODAIS & TOAST
+// ================================================================
+let _modalCb = null;
 function showModal(opts) {
   const m = document.getElementById('custom-modal');
-  document.getElementById('modal-title').textContent = opts.title || 'Aviso';
-  document.getElementById('modal-desc').innerHTML = opts.desc || '';
-  
+  document.getElementById('modal-title').textContent   = opts.title || 'Aviso';
+  document.getElementById('modal-desc').innerHTML      = opts.desc  || '';
   const inp = document.getElementById('modal-input');
-  if(opts.type === 'prompt') {
-    inp.style.display = 'block'; inp.value = opts.val || ''; inp.type = opts.inpType || 'text'; inp.focus();
+  if (opts.type === 'prompt') {
+    inp.style.display = 'block'; inp.value = opts.val || '';
+    inp.type = opts.inpType || 'text';
+    setTimeout(() => inp.focus(), 120);
   } else { inp.style.display = 'none'; }
-
-  const actions = document.getElementById('modal-actions-container');
-  actions.innerHTML = '';
-  actions.className = (opts.customButtons && opts.customButtons.length > 2) ? 'modal-actions col' : 'modal-actions row';
-
+  const ac = document.getElementById('modal-actions-container');
+  ac.innerHTML = '';
+  ac.className = (opts.customButtons && opts.customButtons.length > 2) ? 'modal-actions col' : 'modal-actions row';
   if (opts.customButtons) {
     opts.customButtons.forEach(b => {
       const btn = document.createElement('button');
       btn.className = `modal-btn ${b.class}`; btn.textContent = b.text;
       btn.onclick = () => {
-        if (b.onClick) b.onClick(inp.style.display === 'block' ? inp.value : true);
+        if (b.onClick) b.onClick(inp.style.display==='block' ? inp.value : true);
         if (b.close !== false) closeModal();
       };
-      actions.appendChild(btn);
+      ac.appendChild(btn);
     });
   } else {
-    if(opts.type === 'confirm' || opts.type === 'prompt') {
-      const btnCancel = document.createElement('button');
-      btnCancel.className = 'modal-btn cancel'; btnCancel.textContent = 'Cancelar'; btnCancel.onclick = closeModal;
-      actions.appendChild(btnCancel);
+    if (opts.type === 'confirm' || opts.type === 'prompt') {
+      const c = document.createElement('button');
+      c.className = 'modal-btn cancel'; c.textContent = 'Cancelar'; c.onclick = closeModal;
+      ac.appendChild(c);
     }
-    const btnOk = document.createElement('button');
-    btnOk.className = 'modal-btn confirm'; btnOk.textContent = 'OK';
-    btnOk.onclick = () => {
-      if(modalCallback) modalCallback(inp.style.display === 'block' ? inp.value : true);
+    const ok = document.createElement('button');
+    ok.className = 'modal-btn confirm'; ok.textContent = 'OK';
+    ok.onclick = () => {
+      if (_modalCb) _modalCb(inp.style.display==='block' ? inp.value : true);
       closeModal();
     };
-    actions.appendChild(btnOk);
+    ac.appendChild(ok);
   }
-
-  modalCallback = opts.onConfirm || null;
+  _modalCb = opts.onConfirm || null;
   m.classList.add('active');
 }
-
 function closeModal() {
   document.getElementById('custom-modal').classList.remove('active');
   document.getElementById('modal-input').blur();
 }
-
-function toast(msg, err=false){
-  const el = document.getElementById('toast'); document.getElementById('toast-msg').textContent = msg;
-  el.className='toast'+(err?' err':'')+' on'; setTimeout(()=>el.classList.remove('on'), 2800);
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  el.className = 'toast'+(err?' err':'')+' on';
+  setTimeout(() => el.classList.remove('on'), 2800);
 }
 
-// ================= DETECÇÃO iOS =================
+// ================================================================
+//  iOS INSTALL PROMPT
+// ================================================================
 function checkIOS() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const isStandalone = window.navigator.standalone;
-  if (isIOS && !isStandalone) {
-    const promptClosed = localStorage.getItem('finzap_ios_prompt');
-    if(!promptClosed) document.getElementById('ios-prompt').style.display = 'block';
-  }
+  if (isIOS && !window.navigator.standalone && !localStorage.getItem('finzap_ios_prompt'))
+    document.getElementById('ios-prompt').style.display = 'block';
 }
 function closeIOSPrompt() {
   document.getElementById('ios-prompt').style.display = 'none';
   localStorage.setItem('finzap_ios_prompt', '1');
 }
 
-// ================= LOGIN / ONBOARDING =================
+// ================================================================
+//  AUTH
+// ================================================================
 if (!userId) {
   document.getElementById('login-screen').style.display = 'flex';
-  checkIOS(); 
+  checkIOS();
 } else {
   document.getElementById('app').style.display = 'flex';
-  carregarDadosDaPlanilha();
+  iniciarApp();
 }
 
-function irParaRegistro() { document.getElementById('login-screen').style.display = 'none'; document.getElementById('register-screen').style.display = 'flex'; }
-function irParaLogin() { document.getElementById('register-screen').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex'; }
+function irParaRegistro() { document.getElementById('login-screen').style.display='none'; document.getElementById('register-screen').style.display='flex'; }
+function irParaLogin()     { document.getElementById('register-screen').style.display='none'; document.getElementById('login-screen').style.display='flex'; }
 
 async function fazerLogin() {
-  const user = document.getElementById('log-user').value.trim().toLowerCase().replace(/\s/g, '');
+  const user = document.getElementById('log-user').value.trim().toLowerCase().replace(/\s/g,'');
   const pass = document.getElementById('log-pass').value.trim();
-  
-  if(!user || !pass) return showModal({title:"Erro", desc:"Preencha todos os campos."});
-  
+  if (!user||!pass) return showModal({title:"Erro", desc:"Preencha todos os campos."});
   const btn = document.getElementById('btn-login');
-  btn.textContent = "Entrando..."; btn.disabled = true;
-
+  btn.textContent="Entrando..."; btn.disabled=true;
   try {
-    const url = `${SHEETS_URL}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
-    const r = await fetch(url);
-    const res = await r.json();
-    
+    const res = await fetch(`${SHEETS_URL}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`).then(r=>r.json());
     if (res.ok) {
-      userId = user; userName = res.nome; salarioBase = parseFloat(res.salarioBase) || 0;
-      localStorage.setItem('finzap_user', userId); localStorage.setItem('finzap_nome', userName); localStorage.setItem('finzap_salario_base', salarioBase);
-      document.getElementById('login-screen').style.display = 'none'; document.getElementById('app').style.display = 'flex';
-      checkIOS(); carregarDadosDaPlanilha();
-    } else { showModal({title:"Atenção", desc:res.erro || "Erro ao entrar."}); }
-  } catch(e) { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
-  
-  btn.textContent = "Entrar na Conta"; btn.disabled = false;
+      userId=user; userName=res.nome; salarioBase=parseFloat(res.salarioBase)||0;
+      localStorage.setItem('finzap_user',userId); localStorage.setItem('finzap_nome',userName); localStorage.setItem('finzap_salario_base',salarioBase);
+      document.getElementById('login-screen').style.display='none'; document.getElementById('app').style.display='flex';
+      checkIOS(); iniciarApp();
+    } else showModal({title:"Atenção", desc:res.erro||"Erro ao entrar."});
+  } catch { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
+  btn.textContent="Entrar na Conta"; btn.disabled=false;
 }
 
 async function fazerRegistro() {
   const nome = document.getElementById('reg-name').value.trim();
-  const user = document.getElementById('reg-user').value.trim().toLowerCase().replace(/\s/g, '');
+  const user = document.getElementById('reg-user').value.trim().toLowerCase().replace(/\s/g,'');
   const pass = document.getElementById('reg-pass').value.trim();
-  const sal = parseDinheiro(document.getElementById('reg-sal').value);
-  
-  if(!nome || !user || !pass) return showModal({title:"Erro", desc:"Preencha todos os campos obrigatórios."});
-  
+  const sal  = parseDinheiro(document.getElementById('reg-sal').value);
+  if (!nome||!user||!pass) return showModal({title:"Erro", desc:"Preencha todos os campos."});
   const btn = document.getElementById('btn-register');
-  btn.textContent = "Criando..."; btn.disabled = true;
-
+  btn.textContent="Criando..."; btn.disabled=true;
   try {
-    const url = `${SHEETS_URL}?action=register&nome=${encodeURIComponent(nome)}&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&salarioBase=${encodeURIComponent(sal)}`;
-    const r = await fetch(url);
-    const res = await r.json();
-    
+    const res = await fetch(`${SHEETS_URL}?action=register&nome=${encodeURIComponent(nome)}&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&salarioBase=${encodeURIComponent(sal)}`).then(r=>r.json());
     if (res.ok) {
-      userId = user; userName = res.nome; salarioBase = parseFloat(res.salarioBase) || 0;
-      localStorage.setItem('finzap_user', userId); localStorage.setItem('finzap_nome', userName); localStorage.setItem('finzap_salario_base', salarioBase);
-      document.getElementById('register-screen').style.display = 'none'; document.getElementById('app').style.display = 'flex';
-      checkIOS(); carregarDadosDaPlanilha();
-    } else { showModal({title:"Atenção", desc:res.erro || "Erro ao criar conta."}); }
-  } catch(e) { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
-  
-  btn.textContent = "Criar Conta"; btn.disabled = false;
+      userId=user; userName=res.nome; salarioBase=parseFloat(res.salarioBase)||0;
+      localStorage.setItem('finzap_user',userId); localStorage.setItem('finzap_nome',userName); localStorage.setItem('finzap_salario_base',salarioBase);
+      document.getElementById('register-screen').style.display='none'; document.getElementById('app').style.display='flex';
+      checkIOS(); iniciarApp();
+    } else showModal({title:"Atenção", desc:res.erro||"Erro ao criar conta."});
+  } catch { showModal({title:"Erro de Conexão", desc:"Verifique sua internet."}); }
+  btn.textContent="Criar Conta"; btn.disabled=false;
 }
 
 function fazerLogout() {
-  showModal({
-    title: "Sair",
-    desc: "Tem certeza que deseja sair da sua conta?",
-    type: "confirm",
+  showModal({ title:"Sair", desc:"Tem certeza que deseja sair?", type:"confirm",
     onConfirm: () => { localStorage.clear(); location.reload(); }
   });
 }
 
-// ================= CONFIGURAÇÕES (RENDA E EXTRA) =================
-function getRendaExtra(mesReq) { return parseFloat(localStorage.getItem(`finzap_extra_${userId}_${mesReq}`)) || 0; }
-function setRendaExtra(mesReq, val) { localStorage.setItem(`finzap_extra_${userId}_${mesReq}`, val); }
-
+// ================================================================
+//  CONFIGURAÇÕES
+// ================================================================
 function editBase() {
-  showModal({
-    title: "Salário Base",
-    desc: "Qual o seu novo salário base fixo (Todos os meses)?",
-    type: "prompt",
-    inpType: "number",
-    val: salarioBase > 0 ? salarioBase : "",
+  showModal({ title:"Salário Base", desc:"Novo salário base fixo (todos os meses):", type:"prompt", inpType:"number", val: salarioBase > 0 ? salarioBase : "",
     onConfirm: (v) => {
-      if (v !== null && v.trim() !== "") {
+      if (v && v.trim()) {
         salarioBase = parseDinheiro(v);
         localStorage.setItem('finzap_salario_base', salarioBase);
         renderizarTudo();
-        toast("Salvando na nuvem...");
-        sendToAPI({ action: 'updateBase', user: userId, salarioBase: salarioBase }).then(() => toast("Salvo na nuvem!"));
+        const opId = gerarId();
+        addFila({ id: opId, mesesAfetados: [], payload: { action:'updateBase', user:userId, salarioBase } });
+        executarOpAPI({ id: opId, payload: { action:'updateBase', user:userId, salarioBase } })
+          .then(() => toast("Salário salvo!"));
       }
     }
   });
 }
 
 function editExtra() {
-  const mesReq = strMesAnoBackend(dataVisualizacao);
-  const atual = getRendaExtra(mesReq);
-  
-  let msg = atual > 0 
-    ? `Você já tem ${fmt(atual)} de extra neste mês.\nDigite o novo valor para SOMAR (ou 0 para zerar tudo):`
-    : `Qual valor de renda extra deseja adicionar em ${strMesAnoVisual(dataVisualizacao)}?`;
-    
-  showModal({
-    title: "Renda Extra",
-    desc: msg,
-    type: "prompt",
-    inpType: "number",
-    val: "",
+  const mes = strMesBackend(dataVisualizacao);
+  const atual = getRendaExtra(mes);
+  const msg = atual > 0
+    ? `Você já tem ${fmt(atual)} de extra neste mês.\nDigite o novo valor para SOMAR (ou 0 para zerar):`
+    : `Renda extra em ${strMesVisual(dataVisualizacao)}:`;
+  showModal({ title:"Renda Extra", desc:msg, type:"prompt", inpType:"number", val:"",
     onConfirm: (v) => {
-      if (v !== null && v.trim() !== "") {
-        let num = v.trim() === "0" ? 0 : atual + parseDinheiro(v);
-        setRendaExtra(mesReq, num);
+      if (v && v.trim() !== "") {
+        const novo = v.trim() === "0" ? 0 : atual + parseDinheiro(v);
+        setRendaExtra(mes, novo);
         renderizarTudo();
-        toast("Salvando na nuvem...");
-        sendToAPI({ action: 'updateExtra', user: userId, mesAno: mesReq, valor: num }).then(() => toast("Salvo na nuvem!"));
+        const opId = gerarId();
+        addFila({ id: opId, mesesAfetados: [mes], payload: { action:'updateExtra', user:userId, mesAno:mes, valor:novo } });
+        executarOpAPI({ id: opId, payload: { action:'updateExtra', user:userId, mesAno:mes, valor:novo } })
+          .then(() => toast("Renda extra salva!"));
       }
     }
   });
 }
 
-// ================= NAVEGAÇÃO E SYNC COM DEBOUNCE =================
+// ================================================================
+//  NAVEGAÇÃO ENTRE MESES
+// ================================================================
 function mudarMes(offset) {
-  dataVisualizacao.setMonth(dataVisualizacao.getMonth() + offset);
-  document.getElementById('cur-month').textContent = strMesAnoVisual(dataVisualizacao);
-  
-  document.getElementById('txn-list').innerHTML=''; 
-  document.getElementById('loading-state').style.display='flex';
-  document.getElementById('empty').style.display='none';
-  
-  clearTimeout(fetchTimer);
-  fetchTimer = setTimeout(() => {
-    carregarDadosDaPlanilha();
-  }, 350);
+  dataVisualizacao = new Date(dataVisualizacao.getFullYear(), dataVisualizacao.getMonth() + offset, 1);
+  carregarMes();
 }
 
-async function carregarDadosDaPlanilha() {
-  if(!userId) return;
-  const mesReq = strMesAnoBackend(dataVisualizacao);
-  const mesVis = strMesAnoVisual(dataVisualizacao);
-  
-  document.getElementById('cur-month').textContent = mesVis;
-  
-  const cacheStr = localStorage.getItem(`cache_${userId}_${mesReq}`);
-  if(cacheStr) { txns = JSON.parse(cacheStr); renderizarTudo(); }
-  else { document.getElementById('txn-list').innerHTML=''; document.getElementById('loading-state').style.display='flex'; }
-  
+// ================================================================
+//  CARREGAR MÊS — coração da arquitetura
+//
+//  Fluxo:
+//  1. Lê cache local → exibe imediatamente (0ms)
+//  2. Se não tem cache → mostra loading
+//  3. Aguarda ops pendentes do mês terminarem
+//  4. Busca planilha → atualiza somente se não há mais ops pendentes
+// ================================================================
+function iniciarApp() {
+  carregarMes();
+}
+
+async function carregarMes() {
+  if (!userId) return;
+  const mes = strMesBackend(dataVisualizacao);
+  document.getElementById('cur-month').textContent = strMesVisual(dataVisualizacao);
+
+  // 1. Carrega cache imediatamente
+  const cached = lerCache(mes);
+  if (cached !== null) {
+    txns = cached.map(t => ({ ...t, syncing: false }));
+    renderizarTudo();
+    document.getElementById('loading-state').style.display = 'none';
+  } else {
+    txns = [];
+    document.getElementById('txn-list').innerHTML = '';
+    document.getElementById('loading-state').style.display = 'flex';
+    document.getElementById('empty').style.display = 'none';
+  }
+
   document.getElementById('sync-icon').classList.add('on');
 
-  // Aguarda escritas pendentes com timeout de 8s para não bloquear o carregamento
-  try { await Promise.race([apiQueue, new Promise(r => setTimeout(r, 8000))]); } catch(e) {}
+  // 2. Aguarda ops pendentes deste mês (máx 12s)
+  await esperarOpsPendentes(mes, 12000);
 
-  try {
-    const r = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mesReq)}`);
-    const text = await r.text();
-    let data;
-    try { data = JSON.parse(text); } catch(je) {
-      console.error("Resposta inválida da planilha:", text.substring(0, 200));
-      data = { ok: false };
-    }
-    // Compara trimando espaços para evitar falha por encoding sutil
-    if (data.ok && String(data.mes || "").trim() === mesReq.trim()) {
-      // Planilha é sempre a fonte da verdade após o fetch.
-      txns = (data.transacoes || []).map(t => ({...t, tipo: normalizarTipo(t.tipo), syncing: false}));
-      localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
-      
-      if(data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
-      if(data.salarioBase !== undefined) { salarioBase = parseFloat(data.salarioBase) || 0; localStorage.setItem('finzap_salario_base', salarioBase); }
-      if(data.rendaExtra !== undefined) { setRendaExtra(mesReq, parseFloat(data.rendaExtra) || 0); }
-    } else if (!data.ok) {
-      console.error("Planilha retornou erro:", data.erro || JSON.stringify(data));
-    }
-  } catch(e) { console.error("Erro ao carregar planilha:", e); }
-  
+  // 3. Só busca da planilha se ainda não tem ops pendentes
+  //    (pode ter chegado nova op enquanto esperávamos)
+  if (!mesPossuiOpPendente(mes)) {
+    await fetchPlanilha(mes);
+  }
+
   document.getElementById('sync-icon').classList.remove('on');
   document.getElementById('loading-state').style.display = 'none';
   renderizarTudo();
 }
 
-// ================= RENDERIZAÇÃO E KPIs =================
-function renderizarTudo() {
-  if(!userId) return;
-  const mesReq = strMesAnoBackend(dataVisualizacao);
-  const extraVal = getRendaExtra(mesReq);
-
-  document.getElementById('cfg-user').textContent = `${userName} (@${userId})`;
-  document.getElementById('cfg-base').textContent = fmt(salarioBase);
-  document.getElementById('cfg-extra').textContent = "+ " + fmt(extraVal);
-
-  const btnExtra = document.getElementById('btn-main-extra');
-  if (extraVal > 0) { btnExtra.textContent = `+ ${fmt(extraVal)} Extra`; btnExtra.classList.add('has-extra'); }
-  else { btnExtra.textContent = '+ Renda Extra'; btnExtra.classList.remove('has-extra'); }
-
-  let tots = {debito:0, credito:0, pix:0};
-  let catTots = {};
-  let maiorCompra = {produto: "Nenhuma", valor: 0};
-  let parceladasAtivas = 0;
-
-  txns.forEach(t => {
-    tots[t.tipo] = (tots[t.tipo] || 0) + t.valor;
-    catTots[t.categoria || 'Outros'] = (catTots[t.categoria || 'Outros'] || 0) + t.valor;
-    if(t.valor > maiorCompra.valor) maiorCompra = t;
-    if(t.parcelas > 1) parceladasAtivas++;
+// Espera ops pendentes de um mês específico resolverem (polling leve)
+function esperarOpsPendentes(mes, timeoutMs) {
+  return new Promise(resolve => {
+    if (!mesPossuiOpPendente(mes)) return resolve();
+    const start = Date.now();
+    const check = () => {
+      if (!mesPossuiOpPendente(mes) || Date.now() - start > timeoutMs) return resolve();
+      setTimeout(check, 300);
+    };
+    setTimeout(check, 300);
   });
-
-  const gastos = tots.debito + tots.credito + tots.pix;
-  const rendaTotalMes = salarioBase + extraVal;
-  const saldo = rendaTotalMes - gastos;
-
-  const elTotal = document.getElementById('total');
-  elTotal.textContent = fmt(saldo);
-  elTotal.className = 'balance-amount ' + (saldo < 0 ? 'neg' : '');
-  document.getElementById('tot-deb').textContent = fmt(tots.debito);
-  document.getElementById('tot-cred').textContent = fmt(tots.credito);
-  document.getElementById('tot-pix').textContent = fmt(tots.pix);
-
-  let perc = 0;
-  if(rendaTotalMes > 0) perc = Math.min(100, Math.round((gastos / rendaTotalMes) * 100));
-  document.getElementById('dash-perc').textContent = perc + '%';
-  const arco = (perc / 100) * 251.2;
-  document.getElementById('chart-prog').setAttribute('stroke-dasharray', `${arco} 251.2`);
-  document.getElementById('chart-prog').setAttribute('stroke', perc >= 90 ? '#f04060' : (perc >= 70 ? '#e8a020' : '#5b5ef4'));
-
-  const diasNoMes = new Date(dataVisualizacao.getFullYear(), dataVisualizacao.getMonth() + 1, 0).getDate();
-  let diaAtual = diasNoMes;
-  if (dataVisualizacao.getMonth() === new Date().getMonth() && dataVisualizacao.getFullYear() === new Date().getFullYear()) {
-    diaAtual = Math.max(1, new Date().getDate());
-  }
-  const mediaDiaria = gastos / diaAtual;
-  const projecao = mediaDiaria * diasNoMes;
-  
-  let maiorCatNome = "Nenhuma"; let maiorCatValor = 0;
-  for(let c in catTots) { if(catTots[c] > maiorCatValor) { maiorCatValor = catTots[c]; maiorCatNome = c; } }
-
-  document.getElementById('kpi-gasto').textContent = fmt(gastos);
-  document.getElementById('kpi-ticket').textContent = txns.length > 0 ? fmt(gastos / txns.length) : 'R$ 0,00';
-  document.getElementById('kpi-maior').textContent = maiorCompra.valor > 0 ? `${maiorCompra.produto} (${fmt(maiorCompra.valor)})` : 'Nenhuma';
-  document.getElementById('kpi-maior').style.color = maiorCompra.valor > 0 ? 'var(--t1)' : 'var(--t2)';
-  document.getElementById('kpi-cat').textContent = maiorCatValor > 0 ? maiorCatNome : 'Nenhuma';
-  document.getElementById('kpi-cat').style.color = maiorCatValor > 0 ? 'var(--t1)' : 'var(--t2)';
-  document.getElementById('kpi-diario').textContent = fmt(mediaDiaria) + '/dia';
-  document.getElementById('kpi-proj').textContent = fmt(projecao);
-  document.getElementById('kpi-proj').style.color = projecao > rendaTotalMes ? 'var(--re)' : 'var(--t1)';
-  document.getElementById('kpi-vol').textContent = txns.length;
-  document.getElementById('kpi-parc').textContent = parceladasAtivas;
-
-  const list = document.getElementById('txn-list');
-  const empty = document.getElementById('empty');
-  
-  if (fil !== 'resumo' && fil !== 'config') {
-    const vis = fil === 'todos' ? txns : txns.filter(t => t.tipo === fil);
-    list.innerHTML=''; 
-    if(!vis.length) { list.style.display = 'none'; empty.style.display = 'flex'; document.getElementById('loading-state').style.display='none'; return; }
-    
-    empty.style.display = 'none'; list.style.display = 'block';
-
-    [...vis].reverse().forEach((t) => {
-      const c = {debito:'#1db87a', credito:'#f04060', pix:'#08b8d8'}[t.tipo] || '#9090b0';
-      const bg = {debito:'ic-bg-g', credito:'ic-bg-r', pix:'ic-bg-c'}[t.tipo] || 'ic-bg-g';
-      
-      const svgs = {
-        debito: `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>`,
-        credito:`<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"></rect><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"></path><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"></rect>`,
-        pix:    `<path d="M11 3.5L8 10h3.5L9 16.5" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>`
-      };
-      const bdgs = {debito:['Débito','bdg-g'], credito:['Crédito','bdg-r'], pix:['Pix','bdg-c']}[t.tipo] || ['Outro','bdg-g'];
-      
-      const sub = t.parcelas>1 ? `Parcela ${t.parcelaNum||1}/${t.parcelas} · ${t.data||t.mesAno}` : (t.data||t.mesAno);
-      const catBadge = t.categoria && t.categoria !== 'Outros' ? `<span class="bdg bdg-cat">${t.categoria}</span>` : '';
-      
-      let spinIcon = t.syncing ? `<svg class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>` : '';
-      
-      const el = document.createElement('div');
-      el.className = `txn ${t.syncing ? 'is-syncing' : ''}`;
-      const realIndex = txns.indexOf(t); 
-      
-      el.innerHTML=`
-        <div class="txn-ic ${bg}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none">${svgs[t.tipo]}</svg></div>
-        <div class="txn-body">
-          <div class="txn-name">${t.produto} ${spinIcon}</div>
-          <div class="txn-sub">${sub}</div>
-        </div>
-        <div class="txn-right">
-          <div class="txn-val">-${fmt(t.valor)}</div>
-          <div class="badges">
-            ${catBadge} <span class="bdg ${bdgs[1]}">${bdgs[0]}</span>
-            ${t.parcelas>1 ? `<span class="bdg bdg-a">${t.parcelas}x</span>` : ''}
-          </div>
-        </div>
-        <button class="btn-del" onclick="excluirTxn(${realIndex})" aria-label="Excluir">
-          <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>`;
-      list.appendChild(el);
-    });
-  }
 }
 
-// ================= DELETAR =================
-function excluirTxn(index) {
-  const txnParaExcluir = txns[index];
+async function fetchPlanilha(mes) {
+  try {
+    const r    = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mes)}`);
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch { return; }
 
-  if (txnParaExcluir.parcelas > 1) {
+    // Dupla verificação: após o fetch, não sobrescreve se surgiu nova op pendente
+    if (mesPossuiOpPendente(mes)) return;
+
+    if (data.ok && String(data.mes||'').trim() === mes) {
+      txns = (data.transacoes||[]).map(t => ({ ...t, tipo: normTipo(t.tipo), syncing: false }));
+      salvarCache(mes, txns);
+
+      if (data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
+      if (data.salarioBase !== undefined) { salarioBase = parseFloat(data.salarioBase)||0; localStorage.setItem('finzap_salario_base', salarioBase); }
+      if (data.rendaExtra  !== undefined) { setRendaExtra(mes, parseFloat(data.rendaExtra)||0); }
+    }
+  } catch (e) { console.error('fetchPlanilha erro:', e); }
+}
+
+// ================================================================
+//  ADICIONAR TRANSAÇÃO (Otimista + Fila)
+// ================================================================
+function adicionarTxnOtimista(txnData) {
+  // txnData: { produto, valor(parcela), valorTotal, tipo, categoria, parcelas,
+  //            parcelaNum, mesAno, idTransacao, mensagem }
+  const mes = txnData.mesAno;
+  const mesAtual = strMesBackend(dataVisualizacao);
+
+  // Atualiza estado e cache de TODOS os meses afetados
+  const mesesAfetados = [];
+  for (let p = 0; p < txnData.parcelas; p++) {
+    const mesAlvo = mesOffset(mes, p);
+    mesesAfetados.push(mesAlvo);
+
+    const entrada = {
+      ...txnData,
+      parcelaNum: p + 1,
+      mesAno: mesAlvo,
+      data: p === 0 ? (txnData.data || '') : ('01/' + mesAlvo),
+      syncing: false   // nunca mostramos spinner nas parcelas
+    };
+
+    const lista = lerCache(mesAlvo) || [];
+    // Evita duplicata
+    if (!lista.find(t => t.idTransacao === txnData.idTransacao && t.parcelaNum === p+1)) {
+      lista.push(entrada);
+      salvarCache(mesAlvo, lista);
+    }
+  }
+
+  // Atualiza txns em memória se for o mês visível
+  if (mes === mesAtual || mesesAfetados.includes(mesAtual)) {
+    const cached = lerCache(mesAtual);
+    if (cached) txns = cached;
+  }
+
+  return mesesAfetados;
+}
+
+function removerTxnOtimistaLocal(idTransacao, apenasParcelaNum, mesVisivel) {
+  // Remove do cache do mês visível imediatamente
+  const lista = (lerCache(mesVisivel) || []).filter(t => {
+    if (t.idTransacao !== idTransacao) return true;
+    if (apenasParcelaNum !== null) return t.parcelaNum !== apenasParcelaNum;
+    return false; // delete_all: remove todos
+  });
+  salvarCache(mesVisivel, lista);
+  txns = lista;
+}
+
+function removerTxnTodosCaches(idTransacao) {
+  // Varre todos os caches de meses e remove entradas com este idTransacao
+  Object.keys(localStorage).forEach(k => {
+    if (!k.startsWith(`cache_${userId}_`)) return;
+    try {
+      const lista = JSON.parse(localStorage.getItem(k) || '[]');
+      const nova  = lista.filter(t => t.idTransacao !== idTransacao);
+      if (nova.length !== lista.length) localStorage.setItem(k, JSON.stringify(nova));
+    } catch {}
+  });
+}
+
+// ================================================================
+//  DELETAR
+// ================================================================
+function excluirTxn(idTransacao) {
+  const t = txns.find(x => x.idTransacao === idTransacao);
+  if (!t) return;
+
+  if (t.parcelas > 1) {
     showModal({
       title: "Excluir Parcelamento",
-      desc: `Esta compra (${txnParaExcluir.produto}) é parcelada em ${txnParaExcluir.parcelas}x.\nO que você deseja fazer?`,
+      desc: `"${t.produto}" é parcelada em ${t.parcelas}x.\nO que deseja fazer?`,
       customButtons: [
-        { text: "Excluir Todas as Parcelas", class: "danger", onClick: () => processarExclusao(index, true) },
-        { text: "Excluir Só Esta Parcela", class: "confirm", onClick: () => processarExclusao(index, false) },
-        { text: "Cancelar", class: "cancel" }
+        { text: "Excluir Todas as Parcelas", class: "danger",   onClick: () => processarExclusao(t, true)  },
+        { text: "Excluir Só Esta Parcela",   class: "confirm",  onClick: () => processarExclusao(t, false) },
+        { text: "Cancelar",                  class: "cancel" }
       ]
     });
   } else {
     showModal({
       title: "Excluir Compra",
-      desc: "Deseja excluir esta compra da tela e da planilha?",
+      desc: "Deseja excluir esta compra?",
       type: "confirm",
-      onConfirm: () => processarExclusao(index, false)
+      onConfirm: () => processarExclusao(t, false)
     });
   }
 }
 
-function processarExclusao(index, deleteAll) {
-  const txnParaExcluir = txns[index];
-  txns.splice(index, 1);
-  const mesReq = strMesAnoBackend(dataVisualizacao);
+function processarExclusao(t, deleteAll) {
+  const mes = strMesBackend(dataVisualizacao);
+  const opId = gerarId();
 
+  // 1. Remove do estado local imediatamente
   if (deleteAll) {
-    invalidarCaches(); 
+    removerTxnTodosCaches(t.idTransacao);
+  } else {
+    removerTxnOtimistaLocal(t.idTransacao, t.parcelaNum, mes);
   }
-  
-  localStorage.setItem(`cache_${userId}_${mesReq}`, JSON.stringify(txns));
   renderizarTudo();
-  
-  sendToAPI({ 
-    action: deleteAll ? 'delete_all' : 'delete', 
-    user: userId, 
-    mesAno: mesReq, 
-    produto: txnParaExcluir.produto, 
-    valor: txnParaExcluir.valor, 
-    valorTotal: txnParaExcluir.valorTotal || txnParaExcluir.valor, 
-    tipo: txnParaExcluir.tipo,
-    parcelas: txnParaExcluir.parcelas,
-    parcelaNum: txnParaExcluir.parcelaNum,
-    idTransacao: txnParaExcluir.idTransacao
-  }).then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
+
+  // 2. Determina meses afetados para o controle de ops pendentes
+  const mesesAfetados = [];
+  if (deleteAll) {
+    for (let p = 0; p < t.parcelas; p++) mesesAfetados.push(mesOffset(t.mesAno || mes, p - (t.parcelaNum - 1)));
+  } else {
+    mesesAfetados.push(mes);
+  }
+
+  // 3. Enfileira operação
+  const payload = {
+    action: deleteAll ? 'delete_all' : 'delete',
+    user: userId,
+    mesAno: mes,
+    produto: t.produto,
+    valor: t.valor,
+    valorTotal: t.valorTotal || t.valor,
+    tipo: t.tipo,
+    parcelas: t.parcelas,
+    parcelaNum: t.parcelaNum,
+    idTransacao: t.idTransacao
+  };
+  addFila({ id: opId, mesesAfetados, payload });
+  executarOpAPI({ id: opId, payload })
+    .then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
 }
 
-// ================= IA E OTIMISTA =================
-function setBubble(html){ document.getElementById('ai-bubble').innerHTML = html; }
+// ================================================================
+//  RENDERIZAÇÃO
+// ================================================================
+function renderizarTudo() {
+  if (!userId) return;
+  const mes = strMesBackend(dataVisualizacao);
+  const extra = getRendaExtra(mes);
 
-async function processar(txt){
-  const w = document.querySelector('.chat-area');
-  const ub = document.createElement('div'); ub.className='bubble bubble-user'; ub.textContent=txt;
-  w.insertBefore(ub, document.getElementById('dots')); setTimeout(()=>ub.remove(), 6000);
+  // Config panel
+  document.getElementById('cfg-user').textContent = `${userName} (@${userId})`;
+  document.getElementById('cfg-base').textContent  = fmt(salarioBase);
+  document.getElementById('cfg-extra').textContent = '+ ' + fmt(extra);
+
+  // Extra btn
+  const btnEx = document.getElementById('btn-main-extra');
+  if (extra > 0) { btnEx.textContent = `+ ${fmt(extra)} Extra`; btnEx.classList.add('has-extra'); }
+  else           { btnEx.textContent = '+ Renda Extra';          btnEx.classList.remove('has-extra'); }
+
+  // Totais
+  let tots = { debito:0, credito:0, pix:0 };
+  let catTots = {}, maiorCompra = { produto:'Nenhuma', valor:0 }, parceladasAtivas = 0;
+  txns.forEach(t => {
+    tots[t.tipo] = (tots[t.tipo]||0) + t.valor;
+    catTots[t.categoria||'Outros'] = (catTots[t.categoria||'Outros']||0) + t.valor;
+    if (t.valor > maiorCompra.valor) maiorCompra = t;
+    if (t.parcelas > 1) parceladasAtivas++;
+  });
+  const gastos = tots.debito + tots.credito + tots.pix;
+  const renda  = salarioBase + extra;
+  const saldo  = renda - gastos;
+
+  const elTotal = document.getElementById('total');
+  elTotal.textContent = fmt(saldo);
+  elTotal.className   = 'balance-amount' + (saldo < 0 ? ' neg' : '');
+  document.getElementById('tot-deb').textContent  = fmt(tots.debito);
+  document.getElementById('tot-cred').textContent = fmt(tots.credito);
+  document.getElementById('tot-pix').textContent  = fmt(tots.pix);
+
+  // Dashboard
+  let perc = renda > 0 ? Math.min(100, Math.round((gastos/renda)*100)) : 0;
+  document.getElementById('dash-perc').textContent = perc + '%';
+  const arco = (perc/100)*251.2;
+  document.getElementById('chart-prog').setAttribute('stroke-dasharray', `${arco} 251.2`);
+  document.getElementById('chart-prog').setAttribute('stroke', perc>=90?'#f04060':(perc>=70?'#e8a020':'#5b5ef4'));
+
+  const diasMes = new Date(dataVisualizacao.getFullYear(), dataVisualizacao.getMonth()+1, 0).getDate();
+  let diaAtual = diasMes;
+  const hoje = new Date();
+  if (dataVisualizacao.getMonth()===hoje.getMonth() && dataVisualizacao.getFullYear()===hoje.getFullYear())
+    diaAtual = Math.max(1, hoje.getDate());
+  const media  = gastos / diaAtual;
+  const proj   = media * diasMes;
+  let maiorCat = 'Nenhuma', maiorCatV = 0;
+  for (let c in catTots) { if (catTots[c] > maiorCatV) { maiorCatV = catTots[c]; maiorCat = c; } }
+
+  document.getElementById('kpi-gasto').textContent  = fmt(gastos);
+  document.getElementById('kpi-ticket').textContent  = txns.length > 0 ? fmt(gastos/txns.length) : 'R$ 0,00';
+  document.getElementById('kpi-maior').textContent   = maiorCompra.valor > 0 ? `${maiorCompra.produto} (${fmt(maiorCompra.valor)})` : 'Nenhuma';
+  document.getElementById('kpi-maior').style.color   = maiorCompra.valor > 0 ? 'var(--t1)' : 'var(--t2)';
+  document.getElementById('kpi-cat').textContent     = maiorCatV > 0 ? maiorCat : 'Nenhuma';
+  document.getElementById('kpi-cat').style.color     = maiorCatV > 0 ? 'var(--t1)' : 'var(--t2)';
+  document.getElementById('kpi-diario').textContent  = fmt(media)+'/dia';
+  document.getElementById('kpi-proj').textContent    = fmt(proj);
+  document.getElementById('kpi-proj').style.color    = proj > renda ? 'var(--re)' : 'var(--t1)';
+  document.getElementById('kpi-vol').textContent     = txns.length;
+  document.getElementById('kpi-parc').textContent    = parceladasAtivas;
+
+  // Lista
+  if (fil === 'resumo' || fil === 'config') return;
+  const list  = document.getElementById('txn-list');
+  const empty = document.getElementById('empty');
+  document.getElementById('loading-state').style.display = 'none';
+
+  const vis = fil === 'todos' ? txns : txns.filter(t => t.tipo === fil);
+  if (!vis.length) {
+    list.style.display = 'none'; empty.style.display = 'flex'; return;
+  }
+  empty.style.display = 'none'; list.style.display = 'block';
+  list.innerHTML = '';
+
+  [...vis].reverse().forEach(t => {
+    const c  = {debito:'#1db87a', credito:'#f04060', pix:'#08b8d8'}[t.tipo]||'#9090b0';
+    const bg = {debito:'ic-bg-g',  credito:'ic-bg-r',  pix:'ic-bg-c'}[t.tipo]||'ic-bg-g';
+    const svgs = {
+      debito:  `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+      credito: `<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"/><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"/><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"/>`,
+      pix:     `<path d="M11 3.5L8 10h3.5L9 16.5" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+    };
+    const bdgs = {debito:['Débito','bdg-g'], credito:['Crédito','bdg-r'], pix:['Pix','bdg-c']}[t.tipo]||['Outro','bdg-g'];
+    const sub  = t.parcelas>1 ? `Parcela ${t.parcelaNum||1}/${t.parcelas} · ${t.data||t.mesAno}` : (t.data||t.mesAno);
+    const catB = t.categoria && t.categoria!=='Outros' ? `<span class="bdg bdg-cat">${t.categoria}</span>` : '';
+
+    const el = document.createElement('div');
+    el.className = 'txn';
+    el.innerHTML = `
+      <div class="txn-ic ${bg}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none">${svgs[t.tipo]||svgs.debito}</svg></div>
+      <div class="txn-body">
+        <div class="txn-name">${t.produto}</div>
+        <div class="txn-sub">${sub}</div>
+      </div>
+      <div class="txn-right">
+        <div class="txn-val">-${fmt(t.valor)}</div>
+        <div class="badges">${catB}<span class="bdg ${bdgs[1]}">${bdgs[0]}</span>${t.parcelas>1?`<span class="bdg bdg-a">${t.parcelas}x</span>`:''}</div>
+      </div>
+      <button class="btn-del" onclick="excluirTxn('${t.idTransacao}')" aria-label="Excluir">
+        <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>`;
+    list.appendChild(el);
+  });
+}
+
+// ================================================================
+//  IA — PROCESSAR MENSAGEM
+// ================================================================
+function setBubble(html) { document.getElementById('ai-bubble').innerHTML = html; }
+
+async function processar(txt) {
+  const w  = document.querySelector('.chat-area');
+  const ub = document.createElement('div');
+  ub.className = 'bubble bubble-user'; ub.textContent = txt;
+  w.insertBefore(ub, document.getElementById('dots'));
+  setTimeout(() => ub.remove(), 6000);
   document.getElementById('dots').classList.add('on');
 
-  const mesAtual = strMesAnoBackend(dataVisualizacao);
-  const mesAtualNum = dataVisualizacao.getMonth() + 1; // Pega o número real do mês atual (1 a 12)
-  
+  const mes = strMesBackend(dataVisualizacao);
+  const mesNum = dataVisualizacao.getMonth() + 1;
+
   const prompt = `Você é um assistente financeiro. Extraia os dados da compra do texto.
 Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
 
 Formato OBRIGATÓRIO:
 {"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "quantidade": 1, "mesAno":"MM/YYYY"}
 
-REGRAS MATEMÁTICAS OBRIGATÓRIAS:
-1. "valor_parcela": Valor de CADA mensalidade (ou o valor da compra se à vista).
-2. "valor_total": É o valor_parcela MULTIPLICADO pelo número de parcelas de UMA única compra.
-3. "quantidade": É quantas vezes a mesma compra ocorreu. NUNCA MULTIPLIQUE OS VALORES PELA QUANTIDADE!
-- Ex 1 ("2x de 15 reais"): valor_parcela = 15.00, valor_total = 30.00, parcelas = 2, quantidade = 1.
-- Ex 2 ("30 reais em 2x"): valor_parcela = 15.00, valor_total = 30.00, parcelas = 2, quantidade = 1.
-- Ex 3 ("duas cobranças de 5 reais"): valor_parcela = 5.00, valor_total = 5.00, parcelas = 1, quantidade = 2.
-- MÊS ATUAL: ${mesAtualNum}. Se o usuário disser "até o fim do ano", a quantidade de parcelas é EXATAMENTE (12 - ${mesAtualNum} + 1).
-  
-Hoje visualizamos ${mesAtual}. Se não for dito o mês, use ${mesAtual}.`;
+REGRAS MATEMÁTICAS:
+1. "valor_parcela": valor de CADA mensalidade (ou valor à vista).
+2. "valor_total": valor_parcela × parcelas de UMA compra.
+3. "quantidade": quantas vezes a mesma compra ocorreu (NUNCA multiplique os valores).
+- Ex 1 ("2x de 15"): valor_parcela=15, valor_total=30, parcelas=2, quantidade=1.
+- Ex 2 ("30 em 2x"): valor_parcela=15, valor_total=30, parcelas=2, quantidade=1.
+- Ex 3 ("duas cobranças de 5"): valor_parcela=5, valor_total=5, parcelas=1, quantidade=2.
+- MÊS ATUAL: ${mesNum}. "até o fim do ano" = ${12 - mesNum + 1} parcelas.
+
+Hoje visualizamos ${mes}. Se não for dito o mês, use ${mes}.`;
 
   try {
-    const r = await fetch(CLAUDE_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ model:CLAUDE_MODEL, max_tokens:300, system:prompt, messages:[{role:'user', content:txt}] }) });
-    const data = await r.json(); document.getElementById('dots').classList.remove('on');
-    
-    const raw = data.content?.[0]?.text || '{}';
-    
-    // 1. Regex à prova de falhas: extrai apenas o bloco entre as chaves { }
+    const r    = await fetch(CLAUDE_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ model:CLAUDE_MODEL, max_tokens:300, system:prompt, messages:[{role:'user', content:txt}] }) });
+    const data = await r.json();
+    document.getElementById('dots').classList.remove('on');
+
+    const raw   = data.content?.[0]?.text || '{}';
     const match = raw.match(/\{[\s\S]*\}/);
-    const jsonStr = match ? match[0] : '{}';
-    const parsed = JSON.parse(jsonStr);
+    const parsed = JSON.parse(match ? match[0] : '{}');
 
-    // 2. Trava de segurança: se a IA inventar um tipo (ex: "dinheiro"), joga para "debito"
-    if (parsed.tipo && !['debito', 'credito', 'pix'].includes(parsed.tipo)) {
-      parsed.tipo = 'debito';
+    if (!['debito','credito','pix'].includes(parsed.tipo)) parsed.tipo = 'debito';
+    parsed.tipo = normTipo(parsed.tipo);
+
+    if (!parsed.valor_parcela && !parsed.valor) {
+      setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return;
     }
-    parsed.tipo = normalizarTipo(parsed.tipo);
 
-    if(parsed.erro || (!parsed.valor_parcela && !parsed.valor)) { setBubble(`Não entendi. Tente: <b>"paguei 200 no pix na padaria"</b>`); return; }
-
-    const parcelas = parsed.parcelas || 1;
-    const quantidade = parsed.quantidade || 1;
+    const parcelas     = parsed.parcelas     || 1;
+    const quantidade   = parsed.quantidade   || 1;
     const valorParcela = parsed.valor_parcela || parsed.valor || 0;
-    const valorTotal = parsed.valor_total || (valorParcela * parcelas) || 0;
+    const valorTotal   = parsed.valor_total   || (valorParcela * parcelas);
+    const mesAlvo      = parsed.mesAno        || mes;
+    const mesAtual     = strMesBackend(dataVisualizacao);
 
-    for (let i = 0; i < quantidade; i++) {
-      const idTx = Date.now().toString(36) + Math.random().toString(36).substring(2) + i;
+    for (let q = 0; q < quantidade; q++) {
+      const idTx = gerarId();
+      const hoje = new Date();
+      const dataHoje = String(hoje.getDate()).padStart(2,'0') + '/' + mesAlvo;
 
-      const novaTxn = { 
-        ...parsed, 
-        valor: valorParcela, 
-        valorTotal: valorTotal, 
-        categoria: parsed.categoria || 'Outros', 
-        parcelaNum: 1, 
-        syncing: true,
-        idTransacao: idTx 
+      const txnBase = {
+        produto:    parsed.produto || 'Compra',
+        valor:      valorParcela,
+        valorTotal: valorTotal,
+        tipo:       parsed.tipo,
+        categoria:  parsed.categoria || 'Outros',
+        parcelas,
+        parcelaNum: 1,
+        mesAno:     mesAlvo,
+        data:       dataHoje,
+        mensagem:   txt,
+        idTransacao: idTx,
+        syncing:    false
       };
-      
-      // Adiciona a parcela 1 na UI do mês atual imediatamente (otimista)
-      if(parsed.mesAno === mesAtual) {
-        txns.push(novaTxn);
-        // Salva o cache AGORA (antes do sendToAPI) para sobreviver a recarregamentos
-        localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns));
+
+      // 1. Atualiza cache otimista em todos os meses afetados
+      const mesesAfetados = adicionarTxnOtimista(txnBase);
+
+      // 2. Se o mês visível foi afetado → re-lê cache e renderiza
+      if (mesesAfetados.includes(mesAtual)) {
+        const cached = lerCache(mesAtual);
+        if (cached) txns = cached;
+        if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
+        else renderizarTudo();
       }
 
-      // Pré-cacheia as parcelas futuras nos meses corretos para navegação imediata
-      // IMPORTANTE: syncing:false nas parcelas futuras — o spinner só existe no mês atual.
-      // A parcela futura já estará confirmada na planilha quando o usuário navegar até lá.
-      if (parcelas > 1) {
-        const [mesBaseNum, anoBaseNum] = parsed.mesAno.split('/').map(Number);
-        for (let p = 1; p < parcelas; p++) {
-          const d = new Date(anoBaseNum, mesBaseNum - 1 + p, 1);
-          const mesFuturo = String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-          const cacheKey = `cache_${userId}_${mesFuturo}`;
-          const cacheExistente = localStorage.getItem(cacheKey);
-          const listaFutura = cacheExistente ? JSON.parse(cacheExistente) : [];
-          // Evita duplicar se já estiver no cache
-          if (!listaFutura.find(t => t.idTransacao === idTx)) {
-            listaFutura.push({
-              ...parsed,
-              valor: valorParcela,
-              valorTotal: valorTotal,
-              categoria: parsed.categoria || 'Outros',
-              parcelaNum: p + 1,
-              mesAno: mesFuturo,
-              data: '01/' + mesFuturo,
-              syncing: false,
-              idTransacao: idTx
-            });
-            localStorage.setItem(cacheKey, JSON.stringify(listaFutura));
-          }
-        }
-      }
-      
-      // Envio para a Fila Única (A nuvem processa na ordem correta, sem atropelos)
-      sendToAPI({...parsed, valor: valorParcela, valorTotal: valorTotal, user:userId, action:'save', mensagem:txt, idTransacao: idTx})
-      .then(() => { 
-        if(parsed.mesAno === mesAtual) {
-          const target = txns.find(t => t.idTransacao === idTx);
-          if (target) target.syncing = false;
-          renderizarTudo(); 
-          localStorage.setItem(`cache_${userId}_${mesAtual}`, JSON.stringify(txns));
-        }
-        // Marca syncing=false nos caches de parcelas futuras
-        if (parcelas > 1) {
-          const [mesBaseNum, anoBaseNum] = parsed.mesAno.split('/').map(Number);
-          for (let p = 1; p < parcelas; p++) {
-            const d = new Date(anoBaseNum, mesBaseNum - 1 + p, 1);
-            const mesFuturo = String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-            const cacheKey = `cache_${userId}_${mesFuturo}`;
-            const lista = localStorage.getItem(cacheKey);
-            if (lista) {
-              const arr = JSON.parse(lista);
-              const t = arr.find(t => t.idTransacao === idTx);
-              if (t) { t.syncing = false; localStorage.setItem(cacheKey, JSON.stringify(arr)); }
-            }
-          }
-        }
-      });
+      // 3. Enfileira envio para planilha
+      const opId = gerarId();
+      const payload = {
+        action: 'save',
+        user: userId,
+        produto: txnBase.produto,
+        valor: valorParcela,
+        valorTotal,
+        tipo: txnBase.tipo,
+        categoria: txnBase.categoria,
+        parcelas,
+        mesAno: mesAlvo,
+        mensagem: txt,
+        idTransacao: idTx
+      };
+      addFila({ id: opId, mesesAfetados, payload });
+      executarOpAPI({ id: opId, payload });
     }
 
-    if(parsed.mesAno === mesAtual) {
-      if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
-      else renderizarTudo();
-    }
-
-    const valExibir = parsed.valor_parcela || parsed.valor || 0;
     const pm = parcelas > 1 ? `, em <b>${parcelas}x</b>` : '';
-    const qm = quantidade > 1 ? ` (${quantidade}x nesse mês)` : '';
-    setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(valExibir)}</b>${pm}${qm}.`);
+    const qm = quantidade > 1 ? ` (${quantidade}× neste mês)` : '';
+    setBubble(`Anotado. <b>${parsed.produto}</b> — <b>${fmt(valorParcela)}</b>${pm}${qm}.`);
 
-  } catch(e) { 
-    console.error("Erro interno capturado:", e);
-    document.getElementById('dots').classList.remove('on'); 
-    setBubble('Erro ao processar. Verifique sua conexão.'); 
+  } catch (e) {
+    console.error('processar erro:', e);
+    document.getElementById('dots').classList.remove('on');
+    setBubble('Erro ao processar. Verifique sua conexão.');
   }
 }
 
-document.getElementById('btn-send').onclick = () => { const m = document.getElementById('msg'); if(m.value) { processar(m.value); m.value=''; m.style.height=''; }};
-document.getElementById('msg').onkeydown = e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('btn-send').click(); }};
-document.getElementById('msg').oninput = function(){ this.style.height=''; this.style.height=Math.min(this.scrollHeight,96)+'px'; };
+// ================================================================
+//  EVENTOS DE INPUT
+// ================================================================
+document.getElementById('btn-send').onclick = () => {
+  const m = document.getElementById('msg');
+  if (m.value.trim()) { processar(m.value.trim()); m.value=''; m.style.height=''; }
+};
+document.getElementById('msg').onkeydown = e => {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('btn-send').click(); }
+};
+document.getElementById('msg').oninput = function() {
+  this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 96) + 'px';
+};
 
-document.querySelectorAll('.tab').forEach(t=>{
-  t.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active'); fil = t.dataset.f;
-    
-    document.getElementById('txn-list').style.display = 'none';
-    document.getElementById('empty').style.display = 'none';
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active');
+    fil = tab.dataset.f;
+
+    document.getElementById('txn-list').style.display   = 'none';
+    document.getElementById('empty').style.display      = 'none';
     document.getElementById('dashboard').classList.remove('active-panel');
     document.getElementById('config-panel').classList.remove('active-panel');
 
-    if (fil === 'resumo') document.getElementById('dashboard').classList.add('active-panel');
+    if      (fil === 'resumo') document.getElementById('dashboard').classList.add('active-panel');
     else if (fil === 'config') document.getElementById('config-panel').classList.add('active-panel');
     else renderizarTudo();
   });
