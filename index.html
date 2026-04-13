@@ -739,8 +739,8 @@ function esperarOpsPendentes(mes, timeoutMs) {
 
 async function fetchPlanilha(mes) {
   try {
-    // CORREÇÃO: Adicionado o parâmetro action=get
-    const r    = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mes=${encodeURIComponent(mes)}&_=${Date.now()}`);
+    // CORREÇÃO AQUI: Mudança de "mes=" para "mesAno=" 
+    const r    = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mesAno=${encodeURIComponent(mes)}&_=${Date.now()}`);
     const text = await r.text();
     let data;
     try { data = JSON.parse(text); } catch { return; }
