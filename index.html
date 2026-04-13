@@ -23,6 +23,7 @@
   --r:14px; --rs:10px;
 }
 html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; color:var(--t1); overflow:hidden; }
+input, button, textarea, select { font-family: inherit; font-size: inherit; } /* PADRONIZACAO DE FONTE */
 #app{ display:flex; flex-direction:column; height:100%; max-width:430px; margin:0 auto; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); position:relative; }
 
 /* Header & Nav */
@@ -147,7 +148,7 @@ textarea.inp:focus{border-color:var(--b3)}
 .log-logo { margin-bottom:30px; display:flex; flex-direction:column; align-items:center; gap:15px; }
 .log-box { background:var(--s1); border:1px solid var(--b1); border-radius:16px; padding:24px; width:100%; max-width:340px; display:flex; flex-direction:column; gap:16px; }
 .log-box label { font-size:11px; color:var(--t3); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block; }
-.log-input { width:100%; background:var(--s2); border:1px solid var(--b2); padding:14px; border-radius:12px; color:var(--t1); font-size:15px; outline:none; font-family:'DM Sans'; transition: 0.2s; }
+.log-input { width:100%; background:var(--s2); border:1px solid var(--b2); padding:14px; border-radius:12px; color:var(--t1); font-size:15px; outline:none; transition: 0.2s; }
 .log-input:focus { border-color:var(--vi); }
 .log-btn { background:var(--vi); color:#fff; border:none; padding:16px; border-radius:12px; font-size:15px; font-weight:500; cursor:pointer; margin-top:10px; transition: 0.2s; }
 .log-btn:disabled { opacity: 0.6; cursor:not-allowed; }
@@ -212,7 +213,7 @@ textarea.inp:focus{border-color:var(--b3)}
   <div class="log-box">
     <div>
       <label>Usuário (@)</label>
-      <input type="text" id="log-user" class="log-input" placeholder="Insira seu user" autocomplete="off">
+      <input type="text" id="log-user" class="log-input" placeholder="Insira seu nome de usuário" autocomplete="off">
     </div>
     <div>
       <label>Senha</label>
@@ -231,11 +232,11 @@ textarea.inp:focus{border-color:var(--b3)}
   <div class="log-box">
     <div>
       <label>Nome de Exibição</label>
-      <input type="text" id="reg-name" class="log-input" placeholder="Ex: Tácito Silva" autocomplete="off">
+      <input type="text" id="reg-name" class="log-input" placeholder="Insira seu nome" autocomplete="off">
     </div>
     <div>
       <label>Nome de Usuário (@ único)</label>
-      <input type="text" id="reg-user" class="log-input" placeholder="Insira seu user" autocomplete="off">
+      <input type="text" id="reg-user" class="log-input" placeholder="Insira seu nome de usuário" autocomplete="off">
     </div>
     <div>
       <label>Senha</label>
@@ -243,7 +244,7 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
     <div>
       <label>Salário Base / Renda Fixa</label>
-      <input type="number" id="reg-sal" class="log-input" placeholder="Ex: 3500" autocomplete="off">
+      <input type="text" inputmode="decimal" id="reg-sal" class="log-input" placeholder="Ex: 3500,00" autocomplete="off">
     </div>
     <button class="log-btn" id="btn-register" onclick="fazerRegistro()">Criar Conta</button>
     <div class="log-link" onclick="irParaLogin()">Já tenho uma conta. Fazer login</div>
@@ -418,11 +419,25 @@ function showModal(opts) {
   document.getElementById('modal-title').textContent   = opts.title || 'Aviso';
   document.getElementById('modal-desc').innerHTML      = opts.desc  || '';
   const inp = document.getElementById('modal-input');
+  
   if (opts.type === 'prompt') {
     inp.style.display = 'block'; inp.value = opts.val || '';
-    inp.type = opts.inpType || 'text';
+    // TRATAMENTO PARA TECLADO NUMERICO / DECIMAL
+    if (opts.inpType === 'decimal') {
+      inp.type = 'text';
+      inp.inputMode = 'decimal';
+    } else if (opts.inpType === 'number') {
+      inp.type = 'number';
+      inp.inputMode = 'numeric';
+    } else {
+      inp.type = opts.inpType || 'text';
+      inp.removeAttribute('inputmode');
+    }
     setTimeout(() => inp.focus(), 120);
-  } else { inp.style.display = 'none'; }
+  } else { 
+    inp.style.display = 'none'; 
+  }
+  
   const ac = document.getElementById('modal-actions-container');
   ac.innerHTML = '';
   ac.className = (opts.customButtons && opts.customButtons.length > 2) ? 'modal-actions col' : 'modal-actions row';
@@ -465,7 +480,7 @@ function toast(msg, err=false) {
 }
 
 // ================================================================
-//  SELETOR DE MÊS INTERATIVO (NOVO)
+//  SELETOR DE MÊS INTERATIVO
 // ================================================================
 let _modalAnoSelecionado = new Date().getFullYear();
 
@@ -590,9 +605,22 @@ async function fazerRegistro() {
 function fazerLogout() {
   showModal({ title:"Sair", desc:"Tem certeza que deseja sair?", type:"confirm",
     onConfirm: () => {
-      const iosPrompt = localStorage.getItem('finzap_ios_prompt');
+      // PRESERVAR DADOS GLOBAIS IMPORTANTES NO LOGOUT (COMO FATURA DO USUARIO E iOS PROMPT)
+      const keysToKeep = ['finzap_ios_prompt'];
+      for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('finzap_fatura_dia_')) keysToKeep.push(k);
+      }
+      
+      const savedVals = {};
+      keysToKeep.forEach(k => savedVals[k] = localStorage.getItem(k));
+      
       localStorage.clear();
-      if (iosPrompt) localStorage.setItem('finzap_ios_prompt', iosPrompt);
+      
+      Object.keys(savedVals).forEach(k => {
+          if (savedVals[k] !== null) localStorage.setItem(k, savedVals[k]);
+      });
+      
       location.reload();
     }
   });
@@ -602,7 +630,8 @@ function fazerLogout() {
 //  CONFIGURAÇÕES DE FATURA E SALÁRIO
 // ================================================================
 function verificarDiaFatura() {
-  if (!localStorage.getItem('finzap_fatura_dia')) {
+  const fatKey = `finzap_fatura_dia_${userId}`;
+  if (!localStorage.getItem(fatKey)) {
     showModal({
       title: "Configuração Rápida",
       desc: "Que dia a fatura do seu cartão de crédito fecha?\n(Compras feitas no crédito a partir desse dia irão para o mês seguinte)",
@@ -612,7 +641,7 @@ function verificarDiaFatura() {
       onConfirm: (v) => {
         let dia = parseInt(v);
         if (isNaN(dia) || dia < 1 || dia > 31) dia = 31; // Padrão
-        localStorage.setItem('finzap_fatura_dia', dia);
+        localStorage.setItem(fatKey, dia);
         renderizarTudo();
         toast("Configurado com sucesso!");
       }
@@ -621,7 +650,8 @@ function verificarDiaFatura() {
 }
 
 function editFatura() {
-  const atual = localStorage.getItem('finzap_fatura_dia') || "31";
+  const fatKey = `finzap_fatura_dia_${userId}`;
+  const atual = localStorage.getItem(fatKey) || "31";
   showModal({
     title: "Fechamento da Fatura",
     desc: "Que dia o seu cartão de crédito fecha?",
@@ -631,7 +661,7 @@ function editFatura() {
     onConfirm: (v) => {
       let dia = parseInt(v);
       if (!isNaN(dia) && dia >= 1 && dia <= 31) {
-        localStorage.setItem('finzap_fatura_dia', dia);
+        localStorage.setItem(fatKey, dia);
         renderizarTudo();
         toast("Dia de fechamento salvo!");
       }
@@ -640,7 +670,7 @@ function editFatura() {
 }
 
 function editBase() {
-  showModal({ title:"Salário Base", desc:"Novo salário base fixo (todos os meses):", type:"prompt", inpType:"number", val: salarioBase > 0 ? salarioBase : "",
+  showModal({ title:"Salário Base", desc:"Novo salário base fixo (todos os meses):", type:"prompt", inpType:"decimal", val: salarioBase > 0 ? salarioBase : "",
     onConfirm: (v) => {
       if (v && v.trim()) {
         salarioBase = parseDinheiro(v);
@@ -662,7 +692,7 @@ function editExtra() {
   const msg = atual > 0
     ? `Você já tem ${fmt(atual)} de extra neste mês.\nDigite o novo valor para SOMAR (ou 0 para zerar):`
     : `Renda extra em ${strMesVisual(dataVisualizacao)}:`;
-  showModal({ title:"Renda Extra", desc:msg, type:"prompt", inpType:"number", val:"",
+  showModal({ title:"Renda Extra", desc:msg, type:"prompt", inpType:"decimal", val:"",
     onConfirm: (v) => {
       if (v && v.trim() !== "") {
         const novo = v.trim() === "0" ? 0 : atual + parseDinheiro(v);
@@ -708,12 +738,10 @@ async function carregarMes() {
     document.getElementById('loading-state').style.display = 'flex';
   }
 
-  // DEBOUNCE DA REQUISIÇÃO (Evita travar o servidor passando os meses rapido)
+  // DEBOUNCE DA REQUISIÇÃO
   if (_syncTimer) clearTimeout(_syncTimer);
   
   _syncTimer = setTimeout(async () => {
-    // A requisição para API só ocorre após 400ms de inatividade do usuário (ele parou de clicar na seta)
-    // E só faz a requisição se ele ainda estiver olhando para a aba que pediu
     if (strMesBackend(dataVisualizacao) !== mesStr) return;
     
     document.getElementById('sync-icon').classList.add('on');
@@ -819,7 +847,7 @@ function renderizarTudo() {
   document.getElementById('cfg-base').textContent  = fmt(salarioBase);
   document.getElementById('cfg-extra').textContent = '+ ' + fmt(extra);
   
-  const fatDia = localStorage.getItem('finzap_fatura_dia') || "31";
+  const fatDia = localStorage.getItem(`finzap_fatura_dia_${userId}`) || "31";
   document.getElementById('cfg-fatura').textContent = `Dia ${fatDia}`;
 
   const btnEx = document.getElementById('btn-main-extra');
@@ -865,7 +893,6 @@ function renderizarTudo() {
   let maiorCat = 'Nenhuma', maiorCatV = 0;
   for (let c in catTots) { if (catTots[c] > maiorCatV) { maiorCatV = catTots[c]; maiorCat = c; } }
 
-  // ATUALIZAÇÃO DOS NOVOS INDICADORES DE RESUMO
   document.getElementById('kpi-gasto').textContent    = fmt(gastos);
   document.getElementById('kpi-tot-cred').textContent = fmt(tots.credito);
   document.getElementById('kpi-tot-deb').textContent  = fmt(tots.debito);
@@ -942,15 +969,13 @@ async function processar(txt) {
 
   // LÓGICA DO FECHAMENTO DO CARTÃO
   const diaAtual = new Date().getDate();
-  const diaFatura = parseInt(localStorage.getItem('finzap_fatura_dia')) || 31;
+  const diaFatura = parseInt(localStorage.getItem(`finzap_fatura_dia_${userId}`)) || 31;
   
   let mesCreditoPadrao = mesAtualVisivel;
-  // Se já chegamos no dia do fechamento da fatura, o padrão do crédito avança um mês
   if (diaAtual >= diaFatura) {
     mesCreditoPadrao = mesOffset(mesAtualVisivel, 1);
   }
 
-  // PROMPT TOTALMENTE ATUALIZADO 
   const prompt = `Você é um assistente financeiro. Extraia os dados da compra do texto.
 Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
 
