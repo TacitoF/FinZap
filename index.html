@@ -34,7 +34,8 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 .nav-btn{ background:none; border:none; color:var(--vi); padding:12px 18px; cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:manipulation; outline:none; }
 .nav-btn svg { width:14px; height:14px; }
 .nav-btn:active{background:rgba(91,94,244,.25)}
-.hdr-month{ font-family:'DM Mono',monospace; font-size:12px; color:var(--vi); padding:0 4px; font-weight:500; min-width:70px; text-align:center; text-transform: uppercase; }
+.hdr-month{ font-family:'DM Mono',monospace; font-size:12px; color:var(--vi); padding:6px 10px; font-weight:500; min-width:80px; text-align:center; text-transform: uppercase; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; border-radius:8px; transition:0.2s; }
+.hdr-month:active { background: rgba(91,94,244,.1); }
 
 /* Balance */
 .balance{ margin:0 14px 14px; background:var(--s1); border:1px solid var(--b1); border-radius:var(--r); padding:18px 20px 16px; flex-shrink:0; position:relative; }
@@ -95,9 +96,6 @@ html,body{ height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; 
 .bdg{font-size:10px; padding:2px 7px; border-radius:8px; font-weight:500}
 .bdg-g{background:rgba(29,184,122,.1); color:#5edda8} .bdg-r{background:rgba(240,64,96,.1); color:#f88898} .bdg-c{background:rgba(8,184,216,.1); color:#50d8f0} .bdg-a{background:rgba(232,160,32,.1); color:#f0c060} .bdg-cat{background:var(--b2); color:var(--t2)}
 
-/* Spinner de Sincronização SVG embutido */
-.spin-icon { width: 12px; height: 12px; animation: spin 1s linear infinite; color: var(--vi); position: absolute; right: 0; top: 2px; }
-
 /* Botão Excluir */
 .btn-del { width: 30px; height: 100%; position: absolute; right: 0; top: 0; background: rgba(240,64,96,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #f88898; transition: 0.2s; }
 .btn-del:active { background: rgba(240,64,96,.3); }
@@ -156,9 +154,7 @@ textarea.inp:focus{border-color:var(--b3)}
 .log-link { color:var(--vi); font-size:13px; text-align:center; cursor:pointer; margin-top:5px; font-weight:500; transition: opacity 0.2s; }
 .log-link:active { opacity: 0.6; }
 
-/* -------------------------------------
-   SISTEMA DE MODAIS PERSONALIZADOS
---------------------------------------*/
+/* Modais Personalizados */
 .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(7,7,14,0.85); backdrop-filter:blur(4px); z-index:3000; display:none; align-items:center; justify-content:center; padding:20px; opacity:0; transition:opacity 0.2s; }
 .modal-overlay.active { opacity:1; display:flex; }
 .modal-box { background:var(--s1); border:1px solid var(--b1); border-radius:20px; padding:24px; width:100%; max-width:340px; transform:translateY(20px); transition:transform 0.2s; box-shadow:0 10px 40px rgba(0,0,0,0.6); }
@@ -203,8 +199,8 @@ textarea.inp:focus{border-color:var(--b3)}
     <button class="ios-close" onclick="closeIOSPrompt()">✕</button>
     <p>Instale o Finzap no seu iPhone!</p>
     <div class="ios-sub">
-      <span>1. Clique em <b>Compartilhar</b> (ícone da setinha ou nos <b>...</b> três pontos)</span>
-      <span>2. Deslize e clique em <b>Ver mais</b> (se necessário)</span>
+      <span>1. Clique em <b>Compartilhar</b></span>
+      <span>2. Deslize e clique em <b>Ver mais</b></span>
       <span>3. Escolha <b>Adicionar à Tela de Início</b></span>
     </div>
   </div>
@@ -267,7 +263,10 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
     <div class="hdr-nav">
       <button type="button" class="nav-btn" onclick="mudarMes(-1)" aria-label="Mês Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
-      <div class="hdr-month" id="cur-month">---/----</div>
+      <div class="hdr-month" id="cur-month" onclick="abrirSeletorMes()">
+        <span id="cur-month-text">---/----</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
       <button type="button" class="nav-btn" onclick="mudarMes(1)" aria-label="Próximo Mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
     </div>
   </div>
@@ -296,12 +295,12 @@ textarea.inp:focus{border-color:var(--b3)}
       Resumo
     </button>
     <button class="tab tab-special" data-f="config" aria-label="Configurações">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
   </div>
 
   <div class="content-area">
-    <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Buscando dados...</div></div>
+    <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Sincronizando...</div></div>
     <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"></path></svg></div><p>Nenhum gasto encontrado.</p></div>
     
     <div class="txn-list" id="txn-list"></div>
@@ -322,13 +321,13 @@ textarea.inp:focus{border-color:var(--b3)}
       
       <div class="kpi-grid">
         <div class="kpi-box"><div class="kpi-tit">Total Gasto</div><div class="kpi-val" id="kpi-gasto">R$ 0,00</div></div>
-        <div class="kpi-box"><div class="kpi-tit">Gasto Médio</div><div class="kpi-val" id="kpi-ticket">R$ 0,00</div></div>
-        <div class="kpi-box"><div class="kpi-tit">Maior Compra</div><div class="kpi-val" id="kpi-maior" style="color:var(--t2)">Nenhuma</div></div>
         <div class="kpi-box"><div class="kpi-tit">Maior Categoria</div><div class="kpi-val" id="kpi-cat" style="color:var(--t2)">Nenhuma</div></div>
-        <div class="kpi-box"><div class="kpi-tit">Média / Dia</div><div class="kpi-val" id="kpi-diario">R$ 0,00</div></div>
         <div class="kpi-box"><div class="kpi-tit">Projeção Fim do Mês</div><div class="kpi-val" id="kpi-proj">R$ 0,00</div></div>
         <div class="kpi-box"><div class="kpi-tit">Transações</div><div class="kpi-val" id="kpi-vol">0</div></div>
         <div class="kpi-box"><div class="kpi-tit">Parceladas (Ativas)</div><div class="kpi-val" id="kpi-parc">0</div></div>
+        <div class="kpi-box"><div class="kpi-tit">Total Crédito</div><div class="kpi-val" id="kpi-tot-cred">R$ 0,00</div></div>
+        <div class="kpi-box"><div class="kpi-tit">Total Débito</div><div class="kpi-val" id="kpi-tot-deb">R$ 0,00</div></div>
+        <div class="kpi-box"><div class="kpi-tit">Total Pix</div><div class="kpi-val" id="kpi-tot-pix">R$ 0,00</div></div>
       </div>
     </div>
 
@@ -341,10 +340,10 @@ textarea.inp:focus{border-color:var(--b3)}
         <div class="cfg-title">Financeiro do Mês Atual</div>
         <div class="cfg-row"><span class="cfg-lbl">Salário Base Fixo</span><span class="cfg-val" id="cfg-base" onclick="editBase()">R$ 0</span></div>
         <div class="cfg-row"><span class="cfg-lbl">Adicionar Renda Extra</span><span class="cfg-val" id="cfg-extra" onclick="editExtra()">+ R$ 0</span></div>
+        <div class="cfg-row"><span class="cfg-lbl">Fechamento do Cartão</span><span class="cfg-val" id="cfg-fatura" onclick="editFatura()">Dia 31</span></div>
       </div>
       <button class="btn-logout" onclick="fazerLogout()">Sair da Conta</button>
     </div>
-
   </div>
 
   <div class="chat-area">
@@ -362,114 +361,30 @@ textarea.inp:focus{border-color:var(--b3)}
 
 <script>
 // ================================================================
-//  FINZAP — Frontend v13 (Queue-First Architecture)
-//  Princípios:
-//  1. Estado local é a fonte da verdade durante a sessão
-//  2. Fila de operações garante ordem e nunca perde ações
-//  3. Cache nunca é sobrescrito enquanto há ops pendentes p/ aquele mês
-//  4. Spinner controlado pelo status da op na fila, não pelo fetch
+//  FINZAP — Arquitetura de Consumo Direto (Sessão Rápida)
+//  Sem persistência local para transações. Interface reativa com
+//  cache apenas em memória durante a sessão.
 // ================================================================
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const SHEETS_URL   = "https://script.google.com/macros/s/AKfycbxTTSsjsXUWidIsRUcRQGKLiHgYCALPex7fyXVY_e2ttVTwAjNHKvRb_tPYaIFjnPJWAg/exec";
 const CLAUDE_URL   = "/api/claude";
 
-// ── Variáveis globais de sessão ──────────────────────────────────
+// ── Variáveis de Sessão ──────────────────────────────────────────
 let userId   = localStorage.getItem('finzap_user') || "";
 let userName = localStorage.getItem('finzap_nome') || "";
 let salarioBase = parseFloat(localStorage.getItem('finzap_salario_base')) || 0;
 let dataVisualizacao = new Date();
-let txns = [];          // estado do mês exibido
+let txns = []; 
 let fil  = 'todos';
-let fetchTimer = null;
+let _syncTimer = null;
+
+// Cache em memória
+let memoriaCache = {}; 
 
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-
-// ================================================================
-//  SISTEMA DE FILA DE OPERAÇÕES
-//  Cada operação tem: { id, tipo, payload, mesAfetados[], status }
-//  Status: 'pending' | 'done' | 'error'
-// ================================================================
-
-const QUEUE_KEY = () => `finzap_queue_${userId}`;
-
-function carregarFila() {
-  try { return JSON.parse(localStorage.getItem(QUEUE_KEY()) || '[]'); }
-  catch { return []; }
-}
-function salvarFila(fila) {
-  localStorage.setItem(QUEUE_KEY(), JSON.stringify(fila));
-}
-function addFila(op) {
-  const fila = carregarFila();
-  fila.push({ ...op, id: op.id || gerarId(), status: 'pending' });
-  salvarFila(fila);
-}
-function marcarDone(opId) {
-  const fila = carregarFila();
-  const idx = fila.findIndex(o => o.id === opId);
-  if (idx !== -1) { fila[idx].status = 'done'; salvarFila(fila); }
-  limparFilaDone();
-}
-function limparFilaDone() {
-  // Mantém apenas ops pending (as done já foram processadas)
-  const fila = carregarFila().filter(o => o.status !== 'done');
-  salvarFila(fila);
-}
-function mesPossuiOpPendente(mesStr) {
-  return carregarFila().some(o => o.status === 'pending' && (o.mesesAfetados || []).includes(mesStr));
-}
-
-// ── Promise chain serial (garante ordem de execução) ──────────────
-let _chainPromise = Promise.resolve();
-function enfileirarExecucao(fn) {
-  _chainPromise = _chainPromise.then(() => fn()).catch(e => console.error('Fila erro:', e));
-  return _chainPromise;
-}
-
-// ── Executa uma operação da fila contra a API Sheets ──────────────
-function executarOpAPI(op) {
-  return enfileirarExecucao(() =>
-    fetch(SHEETS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(op.payload),
-      keepalive: true
-    })
-    .then(r => r.text())
-    .then(txt => {
-      try { return JSON.parse(txt); } catch { return { ok: false }; }
-    })
-    .then(res => {
-      marcarDone(op.id);
-      return res;
-    })
-    .catch(e => {
-      console.error('Erro op API:', e);
-      marcarDone(op.id); // marca done mesmo em erro para não bloquear para sempre
-      return { ok: false };
-    })
-  );
-}
-
-// ================================================================
-//  CACHE POR MÊS
-// ================================================================
-function cacheKey(mesStr) { return `cache_${userId}_${mesStr}`; }
-function lerCache(mesStr) {
-  try { return JSON.parse(localStorage.getItem(cacheKey(mesStr)) || 'null'); }
-  catch { return null; }
-}
-function salvarCache(mesStr, lista) {
-  localStorage.setItem(cacheKey(mesStr), JSON.stringify(lista));
-}
-function limparTodosOsCaches() {
-  Object.keys(localStorage).forEach(k => {
-    if (k.startsWith(`cache_${userId}_`)) localStorage.removeItem(k);
-  });
-}
 
 // ================================================================
 //  UTILITÁRIOS
@@ -487,7 +402,6 @@ function normTipo(t) {
   return ['debito','credito','pix'].includes(s) ? s : 'debito';
 }
 function mesOffset(mesStr, offset) {
-  // retorna mesStr deslocado por `offset` meses. ex: "04/2025" + 1 = "05/2025"
   const [m, a] = mesStr.split('/').map(Number);
   const d = new Date(a, m - 1 + offset, 1);
   return String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
@@ -551,6 +465,60 @@ function toast(msg, err=false) {
 }
 
 // ================================================================
+//  SELETOR DE MÊS INTERATIVO (NOVO)
+// ================================================================
+let _modalAnoSelecionado = new Date().getFullYear();
+
+function abrirSeletorMes() {
+  _modalAnoSelecionado = dataVisualizacao.getFullYear();
+  renderSeletorMes();
+}
+
+function renderSeletorMes() {
+  const mesAtual = dataVisualizacao.getMonth();
+  const anoAtual = dataVisualizacao.getFullYear();
+
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; color:var(--t1);">
+      <button onclick="mudarAnoModal(-1)" style="background:var(--s2); border:1px solid var(--b1); color:var(--vi); border-radius:8px; padding:6px 12px; cursor:pointer;">◀</button>
+      <span style="font-size:16px; font-weight:bold; font-family:'DM Mono',monospace">${_modalAnoSelecionado}</span>
+      <button onclick="mudarAnoModal(1)" style="background:var(--s2); border:1px solid var(--b1); color:var(--vi); border-radius:8px; padding:6px 12px; cursor:pointer;">▶</button>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;">
+  `;
+
+  MESES.forEach((m, i) => {
+    const isSelected = (_modalAnoSelecionado === anoAtual && i === mesAtual);
+    const bg = isSelected ? 'var(--vi)' : 'var(--s2)';
+    const color = isSelected ? '#fff' : 'var(--t2)';
+    const border = isSelected ? 'var(--vi)' : 'var(--b1)';
+    
+    html += `<button onclick="selecionarMesModal(${i})" style="background:${bg}; color:${color}; border:1px solid ${border}; border-radius:10px; padding:12px 0; font-size:13px; font-weight:500; cursor:pointer; transition:0.2s;">${m}</button>`;
+  });
+
+  html += `</div>`;
+
+  showModal({
+    title: "Selecionar Mês",
+    desc: html,
+    customButtons: [
+      { text: "Cancelar", class: "cancel" }
+    ]
+  });
+}
+
+function mudarAnoModal(offset) {
+  _modalAnoSelecionado += offset;
+  renderSeletorMes();
+}
+
+function selecionarMesModal(mesIndex) {
+  dataVisualizacao = new Date(_modalAnoSelecionado, mesIndex, 1);
+  closeModal();
+  carregarMes();
+}
+
+// ================================================================
 //  iOS INSTALL PROMPT
 // ================================================================
 function checkIOS() {
@@ -593,7 +561,7 @@ async function fazerLogin() {
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
       checkIOS();
-      iniciarApp(); // sempre busca da planilha — sem cache pré-populado
+      iniciarApp(); 
     } else showModal({title:"Atencao", desc:resLogin.erro||"Erro ao entrar."});
   } catch { showModal({title:"Erro de Conexao", desc:"Verifique sua internet."}); }
   btn.textContent="Entrar na Conta"; btn.disabled=false;
@@ -622,7 +590,6 @@ async function fazerRegistro() {
 function fazerLogout() {
   showModal({ title:"Sair", desc:"Tem certeza que deseja sair?", type:"confirm",
     onConfirm: () => {
-      // Preserva apenas preferência de prompt iOS — cache de dados é sempre descartado
       const iosPrompt = localStorage.getItem('finzap_ios_prompt');
       localStorage.clear();
       if (iosPrompt) localStorage.setItem('finzap_ios_prompt', iosPrompt);
@@ -632,8 +599,46 @@ function fazerLogout() {
 }
 
 // ================================================================
-//  CONFIGURAÇÕES
+//  CONFIGURAÇÕES DE FATURA E SALÁRIO
 // ================================================================
+function verificarDiaFatura() {
+  if (!localStorage.getItem('finzap_fatura_dia')) {
+    showModal({
+      title: "Configuração Rápida",
+      desc: "Que dia a fatura do seu cartão de crédito fecha?\n(Compras feitas no crédito a partir desse dia irão para o mês seguinte)",
+      type: "prompt",
+      inpType: "number",
+      val: "31",
+      onConfirm: (v) => {
+        let dia = parseInt(v);
+        if (isNaN(dia) || dia < 1 || dia > 31) dia = 31; // Padrão
+        localStorage.setItem('finzap_fatura_dia', dia);
+        renderizarTudo();
+        toast("Configurado com sucesso!");
+      }
+    });
+  }
+}
+
+function editFatura() {
+  const atual = localStorage.getItem('finzap_fatura_dia') || "31";
+  showModal({
+    title: "Fechamento da Fatura",
+    desc: "Que dia o seu cartão de crédito fecha?",
+    type: "prompt",
+    inpType: "number",
+    val: atual,
+    onConfirm: (v) => {
+      let dia = parseInt(v);
+      if (!isNaN(dia) && dia >= 1 && dia <= 31) {
+        localStorage.setItem('finzap_fatura_dia', dia);
+        renderizarTudo();
+        toast("Dia de fechamento salvo!");
+      }
+    }
+  });
+}
+
 function editBase() {
   showModal({ title:"Salário Base", desc:"Novo salário base fixo (todos os meses):", type:"prompt", inpType:"number", val: salarioBase > 0 ? salarioBase : "",
     onConfirm: (v) => {
@@ -641,10 +646,11 @@ function editBase() {
         salarioBase = parseDinheiro(v);
         localStorage.setItem('finzap_salario_base', salarioBase);
         renderizarTudo();
-        const opId = gerarId();
-        addFila({ id: opId, mesesAfetados: [], payload: { action:'updateBase', user:userId, salarioBase } });
-        executarOpAPI({ id: opId, payload: { action:'updateBase', user:userId, salarioBase } })
-          .then(() => toast("Salário salvo!"));
+        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action:'updateBase', user:userId, salarioBase }) })
+          .then(() => {
+             toast("Salário salvo!");
+             fetchPlanilha(strMesBackend(dataVisualizacao));
+          });
       }
     }
   });
@@ -662,179 +668,90 @@ function editExtra() {
         const novo = v.trim() === "0" ? 0 : atual + parseDinheiro(v);
         setRendaExtra(mes, novo);
         renderizarTudo();
-        const opId = gerarId();
-        addFila({ id: opId, mesesAfetados: [mes], payload: { action:'updateExtra', user:userId, mesAno:mes, valor:novo } });
-        executarOpAPI({ id: opId, payload: { action:'updateExtra', user:userId, mesAno:mes, valor:novo } })
-          .then(() => toast("Renda extra salva!"));
+        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action:'updateExtra', user:userId, mesAno:mes, valor:novo }) })
+          .then(() => {
+             toast("Renda extra salva!");
+             fetchPlanilha(mes);
+          });
       }
     }
   });
 }
 
 // ================================================================
-//  NAVEGAÇÃO ENTRE MESES
+//  NAVEGAÇÃO E SINCRONIZAÇÃO
 // ================================================================
 function mudarMes(offset) {
   dataVisualizacao = new Date(dataVisualizacao.getFullYear(), dataVisualizacao.getMonth() + offset, 1);
   carregarMes();
 }
 
-// ================================================================
-//  CARREGAR MÊS — coração da arquitetura
-//
-//  Fluxo:
-//  1. Lê cache local → exibe imediatamente (0ms)
-//  2. Se não tem cache → mostra loading
-//  3. Aguarda ops pendentes do mês terminarem
-//  4. Busca planilha → atualiza somente se não há mais ops pendentes
-// ================================================================
 function iniciarApp() {
   carregarMes();
+  setTimeout(verificarDiaFatura, 600); // Pergunta o dia da fatura logo ao abrir, se não tiver configurado
 }
 
 async function carregarMes() {
   if (!userId) return;
-  const mes = strMesBackend(dataVisualizacao);
-  document.getElementById('cur-month').textContent = strMesVisual(dataVisualizacao);
+  const mesStr = strMesBackend(dataVisualizacao);
+  document.getElementById('cur-month-text').textContent = strMesVisual(dataVisualizacao);
 
-  // 1. Exibe cache imediatamente se existir — resposta visual instantânea
-  const cached = lerCache(mes);
-  if (cached !== null) {
-    txns = cached.map(t => ({ ...t, syncing: false }));
+  // Memória Otimista: renderiza a tela instantaneamente se os dados já foram puxados nessa sessão
+  if (memoriaCache[mesStr]) {
+    txns = memoriaCache[mesStr];
     renderizarTudo();
     document.getElementById('loading-state').style.display = 'none';
   } else {
     txns = [];
     document.getElementById('txn-list').innerHTML = '';
-    document.getElementById('loading-state').style.display = 'flex';
     document.getElementById('empty').style.display = 'none';
+    document.getElementById('loading-state').style.display = 'flex';
   }
 
-  document.getElementById('sync-icon').classList.add('on');
-
-  // 2. Aguarda ops pendentes deste mes (max 12s)
-  await esperarOpsPendentes(mes, 12000);
-
-  // 3. Sempre busca da planilha — garante dados frescos em qualquer aparelho
-  if (!mesPossuiOpPendente(mes)) {
-    await fetchPlanilha(mes);
-  }
-
-  document.getElementById('sync-icon').classList.remove('on');
-  document.getElementById('loading-state').style.display = 'none';
-  renderizarTudo();
+  // DEBOUNCE DA REQUISIÇÃO (Evita travar o servidor passando os meses rapido)
+  if (_syncTimer) clearTimeout(_syncTimer);
+  
+  _syncTimer = setTimeout(async () => {
+    // A requisição para API só ocorre após 400ms de inatividade do usuário (ele parou de clicar na seta)
+    // E só faz a requisição se ele ainda estiver olhando para a aba que pediu
+    if (strMesBackend(dataVisualizacao) !== mesStr) return;
+    
+    document.getElementById('sync-icon').classList.add('on');
+    await fetchPlanilha(mesStr);
+    document.getElementById('sync-icon').classList.remove('on');
+  }, 400);
 }
 
-// Espera ops pendentes de um mês específico resolverem (polling leve)
-function esperarOpsPendentes(mes, timeoutMs) {
-  return new Promise(resolve => {
-    if (!mesPossuiOpPendente(mes)) return resolve();
-    const start = Date.now();
-    const check = () => {
-      if (!mesPossuiOpPendente(mes) || Date.now() - start > timeoutMs) return resolve();
-      setTimeout(check, 300);
-    };
-    setTimeout(check, 300);
-  });
-}
-
-async function fetchPlanilha(mes) {
+async function fetchPlanilha(mesStr) {
   try {
-    // CORREÇÃO: Garante que "mes" seja passado para alinhar ao Apps Script
-    const r    = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mes=${encodeURIComponent(mes)}&_=${Date.now()}`);
-    const text = await r.text();
-    let data;
-    try { data = JSON.parse(text); } catch { return; }
-
-    // Dupla verificação: após o fetch, não sobrescreve se surgiu nova op pendente
-    if (mesPossuiOpPendente(mes)) return;
+    const r = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mes=${encodeURIComponent(mesStr)}&_=${Date.now()}`);
+    const data = await r.json();
 
     if (data.ok) {
-      // Não depende de data.mes — confiamos que pedimos o mês certo e a planilha respondeu
-      const transacoesFrescas = (data.transacoes||[]).map(t => ({ ...t, tipo: normTipo(t.tipo), syncing: false }));
+      const transacoesFrescas = (data.transacoes||[]).map(t => ({ ...t, tipo: normTipo(t.tipo) }));
+      
+      memoriaCache[mesStr] = transacoesFrescas;
 
-      // Mescla: mantém itens otimistas que ainda não chegaram na planilha
-      // (itens com idTransacao que a planilha ainda não retornou)
-      const idsRemoto = new Set(transacoesFrescas.map(t => t.idTransacao).filter(Boolean));
-      const cacheAtual = lerCache(mes) || [];
-      const pendentesLocais = cacheAtual.filter(t => t.idTransacao && !idsRemoto.has(t.idTransacao));
+      if (strMesBackend(dataVisualizacao) === mesStr) {
+        txns = transacoesFrescas;
 
-      txns = [...transacoesFrescas, ...pendentesLocais];
-      salvarCache(mes, txns);
+        if (data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
+        if (data.salarioBase !== undefined) { salarioBase = parseFloat(data.salarioBase)||0; localStorage.setItem('finzap_salario_base', salarioBase); }
+        if (data.rendaExtra  !== undefined) { setRendaExtra(mesStr, parseFloat(data.rendaExtra)||0); }
 
-      if (data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
-      if (data.salarioBase !== undefined) { salarioBase = parseFloat(data.salarioBase)||0; localStorage.setItem('finzap_salario_base', salarioBase); }
-      if (data.rendaExtra  !== undefined) { setRendaExtra(mes, parseFloat(data.rendaExtra)||0); }
+        document.getElementById('loading-state').style.display = 'none';
+        renderizarTudo();
+      }
     }
-  } catch (e) { console.error('fetchPlanilha erro:', e); }
-}
-
-// ================================================================
-//  ADICIONAR TRANSAÇÃO (Otimista + Fila)
-// ================================================================
-function adicionarTxnOtimista(txnData) {
-  // txnData: { produto, valor(parcela), valorTotal, tipo, categoria, parcelas,
-  //            parcelaNum, mesAno, idTransacao, mensagem }
-  const mes = txnData.mesAno;
-  const mesAtual = strMesBackend(dataVisualizacao);
-
-  // Atualiza estado e cache de TODOS os meses afetados
-  const mesesAfetados = [];
-  for (let p = 0; p < txnData.parcelas; p++) {
-    const mesAlvo = mesOffset(mes, p);
-    mesesAfetados.push(mesAlvo);
-
-    const entrada = {
-      ...txnData,
-      parcelaNum: p + 1,
-      mesAno: mesAlvo,
-      data: p === 0 ? (txnData.data || '') : ('01/' + mesAlvo),
-      syncing: false   // nunca mostramos spinner nas parcelas
-    };
-
-    const lista = lerCache(mesAlvo) || [];
-    // Evita duplicata
-    if (!lista.find(t => t.idTransacao === txnData.idTransacao && t.parcelaNum === p+1)) {
-      lista.push(entrada);
-      salvarCache(mesAlvo, lista);
-    }
+  } catch (e) {
+    console.error('Erro de sincronização:', e);
   }
-
-  // Atualiza txns em memória se for o mês visível
-  if (mes === mesAtual || mesesAfetados.includes(mesAtual)) {
-    const cached = lerCache(mesAtual);
-    if (cached) txns = cached;
-  }
-
-  return mesesAfetados;
-}
-
-function removerTxnOtimistaLocal(idTransacao, apenasParcelaNum, mesVisivel) {
-  // Remove do cache do mês visível imediatamente
-  const lista = (lerCache(mesVisivel) || []).filter(t => {
-    if (t.idTransacao !== idTransacao) return true;
-    if (apenasParcelaNum !== null) return t.parcelaNum !== apenasParcelaNum;
-    return false; // delete_all: remove todos
-  });
-  salvarCache(mesVisivel, lista);
-  txns = lista; // ATUALIZA MEMÓRIA PARA A TELA REAGIR NA HORA
-}
-
-function removerTxnTodosCaches(idTransacao) {
-  // Varre todos os caches de meses e remove entradas com este idTransacao
-  Object.keys(localStorage).forEach(k => {
-    if (!k.startsWith(`cache_${userId}_`)) return;
-    try {
-      const lista = JSON.parse(localStorage.getItem(k) || '[]');
-      const nova  = lista.filter(t => t.idTransacao !== idTransacao);
-      if (nova.length !== lista.length) localStorage.setItem(k, JSON.stringify(nova));
-    } catch {}
-  });
 }
 
 // ================================================================
-//  DELETAR
+//  ADICIONAR & DELETAR TRANSAÇÃO (Otimista em Memória)
 // ================================================================
+
 function excluirTxn(idTransacao) {
   const t = txns.find(x => x.idTransacao === idTransacao);
   if (!t) return;
@@ -844,90 +761,81 @@ function excluirTxn(idTransacao) {
       title: "Excluir Parcelamento",
       desc: `"${t.produto}" é parcelada em ${t.parcelas}x.\nO que deseja fazer?`,
       customButtons: [
-        { text: "Excluir Todas as Parcelas", class: "danger",   onClick: () => processarExclusao(t, true)  },
-        { text: "Excluir Só Esta Parcela",   class: "confirm",  onClick: () => processarExclusao(t, false) },
-        { text: "Cancelar",                  class: "cancel" }
+        { text: "Excluir Todas", class: "danger",  onClick: () => processarExclusao(t, true)  },
+        { text: "Só Esta",       class: "confirm", onClick: () => processarExclusao(t, false) },
+        { text: "Cancelar",      class: "cancel" }
       ]
     });
   } else {
     showModal({
-      title: "Excluir Compra",
-      desc: "Deseja excluir esta compra?",
-      type: "confirm",
+      title: "Excluir Compra", desc: "Deseja excluir esta compra?", type: "confirm",
       onConfirm: () => processarExclusao(t, false)
     });
   }
 }
 
 function processarExclusao(t, deleteAll) {
-  const mes = strMesBackend(dataVisualizacao);
-  const opId = gerarId();
+  const mesAtual = strMesBackend(dataVisualizacao);
 
-  // 1. Remove do estado local imediatamente
   if (deleteAll) {
-    removerTxnTodosCaches(t.idTransacao);
-    
-    // CORREÇÃO CRUCIAL: Removemos da memória ativa da aba atual 
-    // Isso garante que ele suma visualmente ANTES mesmo de mudar de mês
-    txns = txns.filter(x => x.idTransacao !== t.idTransacao); 
+    Object.keys(memoriaCache).forEach(m => {
+      memoriaCache[m] = memoriaCache[m].filter(x => x.idTransacao !== t.idTransacao);
+    });
   } else {
-    removerTxnOtimistaLocal(t.idTransacao, t.parcelaNum, mes);
+    if (memoriaCache[mesAtual]) {
+      memoriaCache[mesAtual] = memoriaCache[mesAtual].filter(x => !(x.idTransacao === t.idTransacao && x.parcelaNum === t.parcelaNum));
+    }
   }
+  
+  txns = memoriaCache[mesAtual] || [];
   renderizarTudo();
 
-  // 2. Determina meses afetados para o controle de ops pendentes
-  const mesesAfetados = [];
-  if (deleteAll) {
-    for (let p = 0; p < t.parcelas; p++) mesesAfetados.push(mesOffset(t.mesAno || mes, p - (t.parcelaNum - 1)));
-  } else {
-    mesesAfetados.push(mes);
-  }
-
-  // 3. Enfileira operação
   const payload = {
     action: deleteAll ? 'delete_all' : 'delete',
-    user: userId,
-    mesAno: mes,
-    produto: t.produto,
-    valor: t.valor,
-    valorTotal: t.valorTotal || t.valor,
-    tipo: t.tipo,
-    parcelas: t.parcelas,
-    parcelaNum: t.parcelaNum,
-    idTransacao: t.idTransacao
+    user: userId, mesAno: mesAtual, produto: t.produto, valor: t.valor,
+    valorTotal: t.valorTotal || t.valor, tipo: t.tipo, parcelas: t.parcelas,
+    parcelaNum: t.parcelaNum, idTransacao: t.idTransacao
   };
-  addFila({ id: opId, mesesAfetados, payload });
-  executarOpAPI({ id: opId, payload })
-    .then(() => toast(deleteAll ? "Todas as parcelas excluídas!" : "Compra excluída!"));
+
+  fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(payload) })
+    .then(() => {
+        toast(deleteAll ? "Parcelamento excluído!" : "Compra excluída!");
+        if (strMesBackend(dataVisualizacao) === mesAtual) {
+            fetchPlanilha(mesAtual);
+        }
+    })
+    .catch(() => toast("Erro de conexão", true));
 }
 
 // ================================================================
-//  RENDERIZAÇÃO
+//  RENDERIZAÇÃO GERAL
 // ================================================================
 function renderizarTudo() {
   if (!userId) return;
   const mes = strMesBackend(dataVisualizacao);
   const extra = getRendaExtra(mes);
 
-  // Config panel
   document.getElementById('cfg-user').textContent = `${userName} (@${userId})`;
   document.getElementById('cfg-base').textContent  = fmt(salarioBase);
   document.getElementById('cfg-extra').textContent = '+ ' + fmt(extra);
+  
+  const fatDia = localStorage.getItem('finzap_fatura_dia') || "31";
+  document.getElementById('cfg-fatura').textContent = `Dia ${fatDia}`;
 
-  // Extra btn
   const btnEx = document.getElementById('btn-main-extra');
   if (extra > 0) { btnEx.textContent = `+ ${fmt(extra)} Extra`; btnEx.classList.add('has-extra'); }
   else           { btnEx.textContent = '+ Renda Extra';          btnEx.classList.remove('has-extra'); }
 
-  // Totais
   let tots = { debito:0, credito:0, pix:0 };
   let catTots = {}, maiorCompra = { produto:'Nenhuma', valor:0 }, parceladasAtivas = 0;
+  
   txns.forEach(t => {
     tots[t.tipo] = (tots[t.tipo]||0) + t.valor;
     catTots[t.categoria||'Outros'] = (catTots[t.categoria||'Outros']||0) + t.valor;
     if (t.valor > maiorCompra.valor) maiorCompra = t;
     if (t.parcelas > 1) parceladasAtivas++;
   });
+  
   const gastos = tots.debito + tots.credito + tots.pix;
   const renda  = salarioBase + extra;
   const saldo  = renda - gastos;
@@ -939,7 +847,6 @@ function renderizarTudo() {
   document.getElementById('tot-cred').textContent = fmt(tots.credito);
   document.getElementById('tot-pix').textContent  = fmt(tots.pix);
 
-  // Dashboard
   let perc = renda > 0 ? Math.min(100, Math.round((gastos/renda)*100)) : 0;
   document.getElementById('dash-perc').textContent = perc + '%';
   const arco = (perc/100)*251.2;
@@ -951,24 +858,26 @@ function renderizarTudo() {
   const hoje = new Date();
   if (dataVisualizacao.getMonth()===hoje.getMonth() && dataVisualizacao.getFullYear()===hoje.getFullYear())
     diaAtual = Math.max(1, hoje.getDate());
+  
   const media  = gastos / diaAtual;
   const proj   = media * diasMes;
+  
   let maiorCat = 'Nenhuma', maiorCatV = 0;
   for (let c in catTots) { if (catTots[c] > maiorCatV) { maiorCatV = catTots[c]; maiorCat = c; } }
 
-  document.getElementById('kpi-gasto').textContent  = fmt(gastos);
-  document.getElementById('kpi-ticket').textContent  = txns.length > 0 ? fmt(gastos/txns.length) : 'R$ 0,00';
-  document.getElementById('kpi-maior').textContent   = maiorCompra.valor > 0 ? `${maiorCompra.produto} (${fmt(maiorCompra.valor)})` : 'Nenhuma';
-  document.getElementById('kpi-maior').style.color   = maiorCompra.valor > 0 ? 'var(--t1)' : 'var(--t2)';
-  document.getElementById('kpi-cat').textContent     = maiorCatV > 0 ? maiorCat : 'Nenhuma';
-  document.getElementById('kpi-cat').style.color     = maiorCatV > 0 ? 'var(--t1)' : 'var(--t2)';
-  document.getElementById('kpi-diario').textContent  = fmt(media)+'/dia';
-  document.getElementById('kpi-proj').textContent    = fmt(proj);
-  document.getElementById('kpi-proj').style.color    = proj > renda ? 'var(--re)' : 'var(--t1)';
-  document.getElementById('kpi-vol').textContent     = txns.length;
-  document.getElementById('kpi-parc').textContent    = parceladasAtivas;
+  // ATUALIZAÇÃO DOS NOVOS INDICADORES DE RESUMO
+  document.getElementById('kpi-gasto').textContent    = fmt(gastos);
+  document.getElementById('kpi-tot-cred').textContent = fmt(tots.credito);
+  document.getElementById('kpi-tot-deb').textContent  = fmt(tots.debito);
+  document.getElementById('kpi-tot-pix').textContent  = fmt(tots.pix);
+  
+  document.getElementById('kpi-cat').textContent      = maiorCatV > 0 ? maiorCat : 'Nenhuma';
+  document.getElementById('kpi-cat').style.color      = maiorCatV > 0 ? 'var(--t1)' : 'var(--t2)';
+  document.getElementById('kpi-proj').textContent     = fmt(proj);
+  document.getElementById('kpi-proj').style.color     = proj > renda ? 'var(--re)' : 'var(--t1)';
+  document.getElementById('kpi-vol').textContent      = txns.length;
+  document.getElementById('kpi-parc').textContent     = parceladasAtivas;
 
-  // Lista
   if (fil === 'resumo' || fil === 'config') return;
   const list  = document.getElementById('txn-list');
   const empty = document.getElementById('empty');
@@ -1016,7 +925,7 @@ function renderizarTudo() {
 }
 
 // ================================================================
-//  IA — PROCESSAR MENSAGEM
+//  IA — PROCESSAMENTO OTIMISTA E DATA DE FECHAMENTO
 // ================================================================
 function setBubble(html) { document.getElementById('ai-bubble').innerHTML = html; }
 
@@ -1028,25 +937,32 @@ async function processar(txt) {
   setTimeout(() => ub.remove(), 6000);
   document.getElementById('dots').classList.add('on');
 
-  const mes = strMesBackend(dataVisualizacao);
+  const mesAtualVisivel = strMesBackend(dataVisualizacao);
   const mesNum = dataVisualizacao.getMonth() + 1;
 
+  // LÓGICA DO FECHAMENTO DO CARTÃO
+  const diaAtual = new Date().getDate();
+  const diaFatura = parseInt(localStorage.getItem('finzap_fatura_dia')) || 31;
+  
+  let mesCreditoPadrao = mesAtualVisivel;
+  // Se já chegamos no dia do fechamento da fatura, o padrão do crédito avança um mês
+  if (diaAtual >= diaFatura) {
+    mesCreditoPadrao = mesOffset(mesAtualVisivel, 1);
+  }
+
+  // PROMPT TOTALMENTE ATUALIZADO 
   const prompt = `Você é um assistente financeiro. Extraia os dados da compra do texto.
 Responda APENAS com um JSON válido, sem NENHUM markdown (sem \`\`\`json).
 
 Formato OBRIGATÓRIO:
 {"produto":"Nome", "valor_total": 120.00, "valor_parcela": 40.00, "tipo":"debito|credito|pix", "categoria":"Alimentação|Transporte|Lazer|Contas|Outros", "parcelas": 3, "quantidade": 1, "mesAno":"MM/YYYY", "descricao":"Contexto extra se houver (ex: cartao de lu, minha mae vai pagar), senao vazio"}
 
-REGRAS MATEMÁTICAS:
+REGRAS:
 1. "valor_parcela": valor de CADA mensalidade (ou valor à vista).
-2. "valor_total": valor_parcela × parcelas de UMA compra.
-3. "quantidade": quantas vezes a mesma compra ocorreu (NUNCA multiplique os valores).
-- Ex 1 ("2x de 15"): valor_parcela=15, valor_total=30, parcelas=2, quantidade=1.
-- Ex 2 ("30 em 2x"): valor_parcela=15, valor_total=30, parcelas=2, quantidade=1.
-- Ex 3 ("duas cobranças de 5"): valor_parcela=5, valor_total=5, parcelas=1, quantidade=2.
-- MÊS ATUAL: ${mesNum}. "até o fim do ano" = ${12 - mesNum + 1} parcelas.
-
-Hoje visualizamos ${mes}. Se não for dito o mês, use ${mes}.`;
+2. "valor_total": valor_parcela × parcelas.
+3. "quantidade": repeticoes da compra (NUNCA multiplique valores).
+- Hoje visualizamos a aba de ${mesAtualVisivel}. Use este mês para 'debito'/'pix' caso o usuário não especifique a data.
+- ATENÇÃO CRÉDITO: A fatura do cartão fecha dia ${diaFatura} e hoje é dia ${diaAtual}. Por padrão, você DEVE lançar compras no 'credito' no mês ${mesCreditoPadrao} (pois a fatura atual já fechou ou está no ciclo normal).`;
 
   try {
     const r    = await fetch(CLAUDE_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ model:CLAUDE_MODEL, max_tokens:300, system:prompt, messages:[{role:'user', content:txt}] }) });
@@ -1068,8 +984,7 @@ Hoje visualizamos ${mes}. Se não for dito o mês, use ${mes}.`;
     const quantidade   = parsed.quantidade   || 1;
     const valorParcela = parsed.valor_parcela || parsed.valor || 0;
     const valorTotal   = parsed.valor_total   || (valorParcela * parcelas);
-    const mesAlvo      = parsed.mesAno        || mes;
-    const mesAtual     = strMesBackend(dataVisualizacao);
+    const mesAlvo      = parsed.mesAno        || (parsed.tipo === 'credito' ? mesCreditoPadrao : mesAtualVisivel);
 
     for (let q = 0; q < quantidade; q++) {
       const idTx = gerarId();
@@ -1077,48 +992,38 @@ Hoje visualizamos ${mes}. Se não for dito o mês, use ${mes}.`;
       const dataHoje = String(hoje.getDate()).padStart(2,'0') + '/' + mesAlvo;
 
       const txnBase = {
-        produto:    parsed.produto || 'Compra',
-        valor:      valorParcela,
-        valorTotal: valorTotal,
-        tipo:       parsed.tipo,
-        categoria:  parsed.categoria || 'Outros',
-        parcelas,
-        parcelaNum: 1,
-        mesAno:     mesAlvo,
-        data:       dataHoje,
-        mensagem:   parsed.descricao || "",
-        idTransacao: idTx,
-        syncing:    false
+        produto: parsed.produto || 'Compra', valor: valorParcela, valorTotal: valorTotal,
+        tipo: parsed.tipo, categoria: parsed.categoria || 'Outros', parcelas,
+        parcelaNum: 1, mesAno: mesAlvo, data: dataHoje, idTransacao: idTx,
+        mensagem: parsed.descricao || "" 
       };
 
-      // 1. Atualiza cache otimista em todos os meses afetados
-      const mesesAfetados = adicionarTxnOtimista(txnBase);
+      for (let p = 0; p < parcelas; p++) {
+        const mesP = mesOffset(mesAlvo, p);
+        if (!memoriaCache[mesP]) memoriaCache[mesP] = [];
+        memoriaCache[mesP].push({
+          ...txnBase, parcelaNum: p + 1, mesAno: mesP, data: p === 0 ? dataHoje : ('01/' + mesP)
+        });
+      }
 
-      // 2. Se o mês visível foi afetado → re-lê cache e renderiza
-      if (mesesAfetados.includes(mesAtual)) {
-        const cached = lerCache(mesAtual);
-        if (cached) txns = cached;
+      if (memoriaCache[mesAtualVisivel]) {
+        txns = memoriaCache[mesAtualVisivel];
         if (fil === 'resumo' || fil === 'config') document.querySelector('[data-f="todos"]').click();
         else renderizarTudo();
       }
 
-      // 3. Enfileira envio para planilha
-      const opId = gerarId();
-      const payload = {
-        action: 'save',
-        user: userId,
-        produto: txnBase.produto,
-        valor: valorParcela,
-        valorTotal,
-        tipo: txnBase.tipo,
-        categoria: txnBase.categoria,
-        parcelas,
-        mesAno: mesAlvo,
-        mensagem: txnBase.mensagem,
-        idTransacao: idTx
-      };
-      addFila({ id: opId, mesesAfetados, payload });
-      executarOpAPI({ id: opId, payload });
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'save', user: userId, produto: txnBase.produto, valor: valorParcela,
+          valorTotal, tipo: txnBase.tipo, categoria: txnBase.categoria, parcelas,
+          mesAno: mesAlvo, mensagem: txnBase.mensagem, idTransacao: idTx
+        })
+      }).then(() => {
+        if (strMesBackend(dataVisualizacao) === mesAtualVisivel) {
+           fetchPlanilha(mesAtualVisivel);
+        }
+      }).catch(e => console.error(e));
     }
 
     const pm = parcelas > 1 ? `, em <b>${parcelas}x</b>` : '';
@@ -1133,7 +1038,7 @@ Hoje visualizamos ${mes}. Se não for dito o mês, use ${mes}.`;
 }
 
 // ================================================================
-//  EVENTOS DE INPUT
+//  EVENTOS DE INPUT E TABS
 // ================================================================
 document.getElementById('btn-send').onclick = () => {
   const m = document.getElementById('msg');
@@ -1146,7 +1051,6 @@ document.getElementById('msg').oninput = function() {
   this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 96) + 'px';
 };
 
-// Tabs
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
