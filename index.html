@@ -600,28 +600,16 @@ async function fazerLogin() {
   const btn = document.getElementById('btn-login');
   btn.textContent="Entrando..."; btn.disabled=true;
   try {
-    const mesAtual = strMesBackend(new Date());
-    // Dispara login e busca de transacoes do mes atual em paralelo
-    const [resLogin, resTxns] = await Promise.all([
-      fetch(`${SHEETS_URL}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`).then(r=>r.json()).catch(()=>({ok:false})),
-      fetch(`${SHEETS_URL}?user=${encodeURIComponent(user)}&mes=${encodeURIComponent(mesAtual)}&_=${Date.now()}`).then(r=>r.json()).catch(()=>({ok:false}))
-    ]);
+    const resLogin = await fetch(`${SHEETS_URL}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`).then(r=>r.json()).catch(()=>({ok:false}));
     if (resLogin.ok) {
       userId=user; userName=resLogin.nome; salarioBase=parseFloat(resLogin.salarioBase)||0;
       localStorage.setItem('finzap_user',userId);
       localStorage.setItem('finzap_nome',userName);
       localStorage.setItem('finzap_salario_base',salarioBase);
-      // Popula cache do mes atual com dados ja buscados — resposta visual imediata
-      if (resTxns.ok) {
-        const txnsFrescas = (resTxns.transacoes||[]).map(t=>({...t, tipo:normTipo(t.tipo), syncing:false}));
-        salvarCache(mesAtual, txnsFrescas);
-        if (resTxns.rendaExtra !== undefined) setRendaExtra(mesAtual, parseFloat(resTxns.rendaExtra)||0);
-        if (resTxns.salarioBase !== undefined) { salarioBase=parseFloat(resTxns.salarioBase)||0; localStorage.setItem('finzap_salario_base',salarioBase); }
-      }
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
       checkIOS();
-      iniciarApp(true); // true = cache do mes atual ja preenchido, pula fetch inicial
+      iniciarApp(); // sempre busca da planilha — sem cache pré-populado
     } else showModal({title:"Atencao", desc:resLogin.erro||"Erro ao entrar."});
   } catch { showModal({title:"Erro de Conexao", desc:"Verifique sua internet."}); }
   btn.textContent="Entrar na Conta"; btn.disabled=false;
@@ -650,16 +638,10 @@ async function fazerRegistro() {
 function fazerLogout() {
   showModal({ title:"Sair", desc:"Tem certeza que deseja sair?", type:"confirm",
     onConfirm: () => {
-      // Preserva caches de transacoes e renda extra para resposta rapida no proximo login
-      const snapshot = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('cache_') || k.startsWith('finzap_extra_') || k === 'finzap_ios_prompt')) {
-          snapshot[k] = localStorage.getItem(k);
-        }
-      }
+      // Preserva apenas preferência de prompt iOS — cache de dados é sempre descartado
+      const iosPrompt = localStorage.getItem('finzap_ios_prompt');
       localStorage.clear();
-      Object.entries(snapshot).forEach(([k,v]) => localStorage.setItem(k, v));
+      if (iosPrompt) localStorage.setItem('finzap_ios_prompt', iosPrompt);
       location.reload();
     }
   });
@@ -722,18 +704,16 @@ function mudarMes(offset) {
 //  3. Aguarda ops pendentes do mês terminarem
 //  4. Busca planilha → atualiza somente se não há mais ops pendentes
 // ================================================================
-function iniciarApp(cachePreenchido) {
-  // Se o login ja populou o cache (cachePreenchido=true), renderiza imediatamente
-  // e dispara fetch em background so para meses sem cache
-  carregarMes(cachePreenchido);
+function iniciarApp() {
+  carregarMes();
 }
 
-async function carregarMes(cacheJaFresco) {
+async function carregarMes() {
   if (!userId) return;
   const mes = strMesBackend(dataVisualizacao);
   document.getElementById('cur-month').textContent = strMesVisual(dataVisualizacao);
 
-  // 1. Carrega cache imediatamente para resposta visual rapida
+  // 1. Exibe cache imediatamente se existir — resposta visual instantânea
   const cached = lerCache(mes);
   if (cached !== null) {
     txns = cached.map(t => ({ ...t, syncing: false }));
@@ -746,31 +726,12 @@ async function carregarMes(cacheJaFresco) {
     document.getElementById('empty').style.display = 'none';
   }
 
-  // Se o cache ja foi preenchido nesta mesma operacao (ex: logo apos login com
-  // fetch paralelo), mostra spinner discreto mas nao refaz o fetch completo —
-  // apenas sincroniza em background sem bloquear a UI
-  if (cacheJaFresco) {
-    document.getElementById('sync-icon').classList.add('on');
-    // Sincronizacao discreta em background sem await (nao bloqueia renderizacao)
-    esperarOpsPendentes(mes, 12000).then(() => {
-      if (!mesPossuiOpPendente(mes)) {
-        fetchPlanilha(mes).then(() => {
-          document.getElementById('sync-icon').classList.remove('on');
-          renderizarTudo();
-        });
-      } else {
-        document.getElementById('sync-icon').classList.remove('on');
-      }
-    });
-    return; // retorna imediatamente — UI ja esta responsiva
-  }
-
   document.getElementById('sync-icon').classList.add('on');
 
   // 2. Aguarda ops pendentes deste mes (max 12s)
   await esperarOpsPendentes(mes, 12000);
 
-  // 3. Busca da planilha para garantir dados atualizados
+  // 3. Sempre busca da planilha — garante dados frescos em qualquer aparelho
   if (!mesPossuiOpPendente(mes)) {
     await fetchPlanilha(mes);
   }
