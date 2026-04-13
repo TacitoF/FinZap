@@ -703,7 +703,7 @@ async function carregarMes() {
   const mes = strMesBackend(dataVisualizacao);
   document.getElementById('cur-month').textContent = strMesVisual(dataVisualizacao);
 
-  // 1. Carrega cache imediatamente
+  // 1. Carrega cache imediatamente para resposta visual rapida
   const cached = lerCache(mes);
   if (cached !== null) {
     txns = cached.map(t => ({ ...t, syncing: false }));
@@ -718,17 +718,18 @@ async function carregarMes() {
 
   document.getElementById('sync-icon').classList.add('on');
 
-  // 2. Aguarda ops pendentes deste mês (máx 12s)
+  // 2. Aguarda ops pendentes deste mes (max 12s)
   await esperarOpsPendentes(mes, 12000);
 
-  // 3. Só busca da planilha se ainda não tem ops pendentes
-  //    (pode ter chegado nova op enquanto esperávamos)
+  // 3. Busca da planilha para garantir dados atualizados
+  //    So pula se ainda ha ops pendentes apos a espera
   if (!mesPossuiOpPendente(mes)) {
     await fetchPlanilha(mes);
   }
 
   document.getElementById('sync-icon').classList.remove('on');
   document.getElementById('loading-state').style.display = 'none';
+  // Sempre re-renderiza apos o fetch para refletir dados reais
   renderizarTudo();
 }
 
@@ -747,7 +748,7 @@ function esperarOpsPendentes(mes, timeoutMs) {
 
 async function fetchPlanilha(mes) {
   try {
-    const r    = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mes)}`);
+    const r    = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mes)}&_=${Date.now()}`);
     const text = await r.text();
     let data;
     try { data = JSON.parse(text); } catch { return; }
@@ -755,8 +756,17 @@ async function fetchPlanilha(mes) {
     // Dupla verificação: após o fetch, não sobrescreve se surgiu nova op pendente
     if (mesPossuiOpPendente(mes)) return;
 
-    if (data.ok && String(data.mes||'').trim() === mes) {
-      txns = (data.transacoes||[]).map(t => ({ ...t, tipo: normTipo(t.tipo), syncing: false }));
+    if (data.ok) {
+      // Não depende de data.mes — confiamos que pedimos o mês certo e a planilha respondeu
+      const transacoesFrescas = (data.transacoes||[]).map(t => ({ ...t, tipo: normTipo(t.tipo), syncing: false }));
+
+      // Mescla: mantém itens otimistas que ainda não chegaram na planilha
+      // (itens com idTransacao que a planilha ainda não retornou)
+      const idsRemoto = new Set(transacoesFrescas.map(t => t.idTransacao).filter(Boolean));
+      const cacheAtual = lerCache(mes) || [];
+      const pendentesLocais = cacheAtual.filter(t => t.idTransacao && !idsRemoto.has(t.idTransacao));
+
+      txns = [...transacoesFrescas, ...pendentesLocais];
       salvarCache(mes, txns);
 
       if (data.nomeExibicao) { userName = data.nomeExibicao; localStorage.setItem('finzap_nome', userName); }
