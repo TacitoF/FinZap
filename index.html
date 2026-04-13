@@ -739,8 +739,8 @@ function esperarOpsPendentes(mes, timeoutMs) {
 
 async function fetchPlanilha(mes) {
   try {
-    // CORREÇÃO AQUI: Mudança de "mes=" para "mesAno=" 
-    const r    = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mesAno=${encodeURIComponent(mes)}&_=${Date.now()}`);
+    // CORREÇÃO: Garante que "mes" seja passado para alinhar ao Apps Script
+    const r    = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mes=${encodeURIComponent(mes)}&_=${Date.now()}`);
     const text = await r.text();
     let data;
     try { data = JSON.parse(text); } catch { return; }
@@ -816,7 +816,7 @@ function removerTxnOtimistaLocal(idTransacao, apenasParcelaNum, mesVisivel) {
     return false; // delete_all: remove todos
   });
   salvarCache(mesVisivel, lista);
-  txns = lista;
+  txns = lista; // ATUALIZA MEMÓRIA PARA A TELA REAGIR NA HORA
 }
 
 function removerTxnTodosCaches(idTransacao) {
@@ -865,6 +865,10 @@ function processarExclusao(t, deleteAll) {
   // 1. Remove do estado local imediatamente
   if (deleteAll) {
     removerTxnTodosCaches(t.idTransacao);
+    
+    // CORREÇÃO CRUCIAL: Removemos da memória ativa da aba atual 
+    // Isso garante que ele suma visualmente ANTES mesmo de mudar de mês
+    txns = txns.filter(x => x.idTransacao !== t.idTransacao); 
   } else {
     removerTxnOtimistaLocal(t.idTransacao, t.parcelaNum, mes);
   }
