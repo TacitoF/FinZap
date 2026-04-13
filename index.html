@@ -2,7 +2,6 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<!-- BLOQUEIO DE ZOOM PARA PARECER APP NATIVO -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" content="#07070e"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -189,7 +188,6 @@ textarea.inp:focus{border-color:var(--b3)}
 </head>
 <body>
 
-<!-- MODAL GENÉRICO CUSTOMIZADO -->
 <div id="custom-modal" class="modal-overlay">
   <div class="modal-box">
     <h3 id="modal-title">Título</h3>
@@ -199,9 +197,7 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 </div>
 
-<!-- TELA DE LOGIN -->
 <div id="login-screen">
-  <!-- iOS INSTALL PROMPT -->
   <div id="ios-prompt" class="ios-prompt">
     <button class="ios-close" onclick="closeIOSPrompt()">✕</button>
     <p>Instale o Finzap no seu iPhone!</p>
@@ -230,7 +226,6 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 </div>
 
-<!-- TELA DE REGISTRO -->
 <div id="register-screen">
   <div class="log-logo">
     <svg width="48" height="48" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#5b5ef4" fill-opacity=".14"></rect><rect x="7" y="8" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect><path d="M19 8.8L9 19.2" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round"></path><rect x="7" y="17.5" width="14" height="2.5" rx="1.25" fill="#5b5ef4"></rect></svg>
@@ -258,9 +253,7 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 </div>
 
-<!-- APP PRINCIPAL -->
 <div id="app" style="display:none;">
-  <!-- Header -->
   <div class="hdr">
     <div class="hdr-left">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -278,7 +271,6 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
   </div>
 
-  <!-- Balance -->
   <div class="balance">
     <div class="syncing" id="sync-icon"></div>
     <div class="balance-top">
@@ -293,7 +285,6 @@ textarea.inp:focus{border-color:var(--b3)}
     </div>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-f="todos">Lista</button>
     <button class="tab" data-f="debito">Débito</button>
@@ -309,14 +300,11 @@ textarea.inp:focus{border-color:var(--b3)}
   </div>
 
   <div class="content-area">
-    <!-- States -->
     <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Buscando dados...</div></div>
     <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"></path></svg></div><p>Nenhum gasto encontrado.</p></div>
     
-    <!-- List -->
     <div class="txn-list" id="txn-list"></div>
 
-    <!-- Dashboard -->
     <div id="dashboard">
       <div class="dash-card">
         <div class="chart-container">
@@ -331,7 +319,6 @@ textarea.inp:focus{border-color:var(--b3)}
         </div>
       </div>
       
-      <!-- Grade de KPIs -->
       <div class="kpi-grid">
         <div class="kpi-box"><div class="kpi-tit">Total Gasto</div><div class="kpi-val" id="kpi-gasto">R$ 0,00</div></div>
         <div class="kpi-box"><div class="kpi-tit">Gasto Médio</div><div class="kpi-val" id="kpi-ticket">R$ 0,00</div></div>
@@ -344,7 +331,6 @@ textarea.inp:focus{border-color:var(--b3)}
       </div>
     </div>
 
-    <!-- Configurações -->
     <div id="config-panel">
       <div class="cfg-section">
         <div class="cfg-title">Perfil do Usuário</div>
@@ -360,20 +346,17 @@ textarea.inp:focus{border-color:var(--b3)}
 
   </div>
 
-  <!-- Chat -->
   <div class="chat-area">
     <div class="bubble" id="ai-bubble">Oi! Sou o <b>Finzap</b>. Me conta sua compra.</div>
     <div class="dots" id="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
   </div>
 
-  <!-- Input -->
   <div class="input-row">
     <textarea class="inp" id="msg" placeholder='Ex: "200 no crédito no mercado"' rows="1"></textarea>
     <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
   </div>
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg><span id="toast-msg"></span></div>
 
 <script>
@@ -756,7 +739,8 @@ function esperarOpsPendentes(mes, timeoutMs) {
 
 async function fetchPlanilha(mes) {
   try {
-    const r    = await fetch(`${SHEETS_URL}?user=${userId}&mes=${encodeURIComponent(mes)}&_=${Date.now()}`);
+    // CORREÇÃO: Adicionado o parâmetro action=get
+    const r    = await fetch(`${SHEETS_URL}?action=get&user=${userId}&mes=${encodeURIComponent(mes)}&_=${Date.now()}`);
     const text = await r.text();
     let data;
     try { data = JSON.parse(text); } catch { return; }
