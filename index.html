@@ -83,6 +83,7 @@
 </div>
 
 <div id="app" style="display:none;">
+  
   <div class="hdr">
     <div class="hdr-left">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -117,27 +118,23 @@
     </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab active" data-f="todos">Lista</button>
-    <button class="tab" data-f="debito">Débito</button>
-    <button class="tab" data-f="credito">Crédito</button>
-    <button class="tab" data-f="pix">Pix</button>
-    <button class="tab tab-special" data-f="resumo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-      Resumo
-    </button>
-    <button class="tab tab-special" data-f="config" aria-label="Configurações">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-    </button>
-  </div>
-
   <div class="content-area">
+    
+    <div class="list-filters" id="list-filters">
+      <button class="f-btn active" data-f="todos">Todos</button>
+      <button class="f-btn" data-f="debito">Débito</button>
+      <button class="f-btn" data-f="credito">Crédito</button>
+      <button class="f-btn" data-f="pix">Pix</button>
+    </div>
+
     <div class="loading-state" id="loading-state"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="loading-text">Sincronizando...</div></div>
     <div class="empty" id="empty"><div class="empty-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#50506a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8 10h8M8 14h5" stroke="#50506a" stroke-width="1.5" stroke-linecap="round"></path></svg></div><p>Nenhum gasto encontrado.</p></div>
     
-    <div class="txn-list" id="txn-list"></div>
+    <div class="tab-content active-panel" id="view-lista">
+      <div class="txn-list" id="txn-list"></div>
+    </div>
 
-    <div id="dashboard">
+    <div class="tab-content" id="view-resumo" style="display:none;">
       <div class="dash-card">
         <div class="chart-container">
           <svg class="chart-svg" viewBox="0 0 100 100">
@@ -163,7 +160,7 @@
       </div>
     </div>
 
-    <div id="config-panel">
+    <div class="tab-content" id="view-config" style="display:none;">
       <div class="cfg-section">
         <div class="cfg-title">Perfil do Usuário</div>
         <div class="cfg-row"><span class="cfg-lbl">Nome</span><span class="cfg-val" id="cfg-user" style="cursor:default; border:none; background:transparent; padding:0;">---</span></div>
@@ -178,15 +175,32 @@
     </div>
   </div>
 
-  <div class="chat-area">
-    <div class="bubble" id="ai-bubble">Oi! Sou o <b>Finzap</b>. Me conta sua compra.</div>
-    <div class="dots" id="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="chat-wrapper" id="chat-wrapper">
+    <div class="chat-area">
+      <div class="bubble" id="ai-bubble">Oi! Sou o <b>Finzap</b>. Me conta sua compra.</div>
+      <div class="dots" id="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+    <div class="input-row">
+      <textarea class="inp" id="msg" placeholder='Ex: "200 no crédito no mercado"' rows="1"></textarea>
+      <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+    </div>
   </div>
 
-  <div class="input-row">
-    <textarea class="inp" id="msg" placeholder='Ex: "200 no crédito no mercado"' rows="1"></textarea>
-    <button class="btn" id="btn-send"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 9h13M9 2.5l6.5 6.5L9 15.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
-  </div>
+  <nav class="bottom-nav">
+    <div class="b-nav-item active" data-tab="lista">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+      <span>Extrato</span>
+    </div>
+    <div class="b-nav-item" data-tab="resumo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+      <span>Resumo</span>
+    </div>
+    <div class="b-nav-item" data-tab="config">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <span>Config</span>
+    </div>
+  </nav>
+
 </div>
 
 <div class="toast" id="toast"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" id="toast-icon"><path d="M2 7l3.5 3.5L12 4" stroke="#5edda8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg><span id="toast-msg"></span></div>

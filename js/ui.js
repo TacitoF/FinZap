@@ -335,7 +335,6 @@ function aplicarEdicao(tOriginal, editAll) {
   editarCompraBackend(dadosEditados, editAll); 
 }
 
-
 // ── Renderização Principal ───────────────────────────────────────
 
 function renderizarTudo() {
@@ -405,56 +404,57 @@ function renderizarTudo() {
   document.getElementById('kpi-vol').textContent      = appState.txns.length;
   document.getElementById('kpi-parc').textContent     = parceladasAtivas;
 
-  if (appState.fil === 'resumo' || appState.fil === 'config') return;
   const list  = document.getElementById('txn-list');
   const empty = document.getElementById('empty');
   document.getElementById('loading-state').style.display = 'none';
 
+  // O filtro de pílulas atua apenas sobre a variável vis
   const vis = appState.fil === 'todos' ? appState.txns : appState.txns.filter(t => t.tipo === appState.fil);
+  
   if (!vis.length) {
-    list.style.display = 'none'; empty.style.display = 'flex'; return;
+    list.style.display = 'none'; empty.style.display = 'flex';
+  } else {
+    empty.style.display = 'none'; list.style.display = 'block';
+    list.innerHTML = '';
+
+    [...vis].reverse().forEach(t => {
+      const c  = {debito:'#1db87a', credito:'#f04060', pix:'#08b8d8'}[t.tipo]||'#9090b0';
+      const bg = {debito:'ic-bg-g',  credito:'ic-bg-r',  pix:'ic-bg-c'}[t.tipo]||'ic-bg-g';
+      const svgs = {
+        debito:  `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+        credito: `<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"/><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"/><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"/>`,
+        pix:     `<path d="M11 3.5L8 10h3.5L9 16.5" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+      };
+      const bdgs = {debito:['Débito','bdg-g'], credito:['Crédito','bdg-r'], pix:['Pix','bdg-c']}[t.tipo]||['Outro','bdg-g'];
+      const sub  = t.parcelas>1 ? `Parcela ${t.parcelaNum||1}/${t.parcelas} · ${t.data||t.mesAno}` : (t.data||t.mesAno);
+      const catB = t.categoria && t.categoria!=='Outros' ? `<span class="bdg bdg-cat">${t.categoria}</span>` : '';
+      const descHtml = t.mensagem && t.mensagem.trim() !== '' ? `<span class="txn-desc">${t.mensagem}</span>` : '';
+
+      const el = document.createElement('div');
+      el.className = 'txn';
+      
+      el.innerHTML = `
+        <div class="txn-ic ${bg}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none">${svgs[t.tipo]||svgs.debito}</svg></div>
+        <div class="txn-body">
+          <div class="txn-name">${t.produto}</div>
+          <div class="txn-sub">${sub}</div>
+          ${descHtml}
+        </div>
+        <div class="txn-right" style="padding-right: 64px;">
+          <div class="txn-val">-${fmt(t.valor)}</div>
+          <div class="badges">${catB}<span class="bdg ${bdgs[1]}\">${bdgs[0]}</span>${t.parcelas>1?`<span class="bdg bdg-a">${t.parcelas}x</span>`:''}</div>
+        </div>
+        <div style="position: absolute; right: 0; top: 0; height: 100%; display: flex;">
+          <button onclick="editarTxn('${t.idTransacao}')" style="width: 32px; height: 100%; background: rgba(91,94,244,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--vi); transition: 0.2s;" aria-label="Editar">
+            <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+          <button class="btn-del" onclick="excluirTxn('${t.idTransacao}')" aria-label="Excluir" style="position: relative; border-left: 1px solid var(--b1); width: 32px;">
+            <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>`;
+      list.appendChild(el);
+    });
   }
-  empty.style.display = 'none'; list.style.display = 'block';
-  list.innerHTML = '';
-
-  [...vis].reverse().forEach(t => {
-    const c  = {debito:'#1db87a', credito:'#f04060', pix:'#08b8d8'}[t.tipo]||'#9090b0';
-    const bg = {debito:'ic-bg-g',  credito:'ic-bg-r',  pix:'ic-bg-c'}[t.tipo]||'ic-bg-g';
-    const svgs = {
-      debito:  `<path d="M10 4v8M7 9l3 3 3-3M7 7l3-3 3 3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-      credito: `<rect x="3" y="5" width="14" height="10" rx="2" stroke="${c}" stroke-width="1.4" fill="none"/><path d="M3 8.5h14" stroke="${c}" stroke-width="1.4"/><rect x="5" y="10.5" width="3.5" height="1.8" rx=".9" fill="${c}"/>`,
-      pix:     `<path d="M11 3.5L8 10h3.5L9 16.5" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
-    };
-    const bdgs = {debito:['Débito','bdg-g'], credito:['Crédito','bdg-r'], pix:['Pix','bdg-c']}[t.tipo]||['Outro','bdg-g'];
-    const sub  = t.parcelas>1 ? `Parcela ${t.parcelaNum||1}/${t.parcelas} · ${t.data||t.mesAno}` : (t.data||t.mesAno);
-    const catB = t.categoria && t.categoria!=='Outros' ? `<span class="bdg bdg-cat">${t.categoria}</span>` : '';
-    const descHtml = t.mensagem && t.mensagem.trim() !== '' ? `<span class="txn-desc">${t.mensagem}</span>` : '';
-
-    const el = document.createElement('div');
-    el.className = 'txn';
-    
-    // Novo container para os botões de edição e exclusão (ajuste visual feito na div interna)
-    el.innerHTML = `
-      <div class="txn-ic ${bg}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none">${svgs[t.tipo]||svgs.debito}</svg></div>
-      <div class="txn-body">
-        <div class="txn-name">${t.produto}</div>
-        <div class="txn-sub">${sub}</div>
-        ${descHtml}
-      </div>
-      <div class="txn-right" style="padding-right: 64px;">
-        <div class="txn-val">-${fmt(t.valor)}</div>
-        <div class="badges">${catB}<span class="bdg ${bdgs[1]}">${bdgs[0]}</span>${t.parcelas>1?`<span class="bdg bdg-a">${t.parcelas}x</span>`:''}</div>
-      </div>
-      <div style="position: absolute; right: 0; top: 0; height: 100%; display: flex;">
-        <button onclick="editarTxn('${t.idTransacao}')" style="width: 32px; height: 100%; background: rgba(91,94,244,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--vi); transition: 0.2s;" aria-label="Editar">
-          <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        </button>
-        <button class="btn-del" onclick="excluirTxn('${t.idTransacao}')" aria-label="Excluir" style="position: relative; border-left: 1px solid var(--b1); width: 32px;">
-          <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        </button>
-      </div>`;
-    list.appendChild(el);
-  });
 }
 
 function setBubble(html) { 

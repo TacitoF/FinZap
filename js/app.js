@@ -13,7 +13,7 @@ window.appState = {
   salarioBase: parseFloat(localStorage.getItem('finzap_salario_base')) || 0,
   dataVisualizacao: new Date(),
   txns: [],
-  fil: 'todos',
+  fil: 'todos', // filtro padrão
   memoriaCache: {}
 };
 
@@ -46,12 +46,12 @@ window.setRendaExtra = function(mes, v) { localStorage.setItem(`finzap_extra_${a
 // ── Navegação e Carregamento ──
 window.mudarMes = function(offset) {
   appState.dataVisualizacao = new Date(appState.dataVisualizacao.getFullYear(), appState.dataVisualizacao.getMonth() + offset, 1);
-  carregarMes(); // O carregarMes original que ficou no app.js precisava voltar pra cá!
+  carregarMes(); 
 };
 
 window.iniciarApp = function() {
   carregarMes();
-  setTimeout(verificarDiaFatura, 600); // UI.js
+  setTimeout(verificarDiaFatura, 600); // Função de UI.js (só roda após o userId existir)
 };
 
 window.carregarMes = async function() {
@@ -61,7 +61,7 @@ window.carregarMes = async function() {
 
   if (appState.memoriaCache[mesStr]) {
     appState.txns = appState.memoriaCache[mesStr];
-    renderizarTudo(); // UI.js
+    renderizarTudo(); 
     document.getElementById('loading-state').style.display = 'none';
   } else {
     appState.txns = [];
@@ -80,7 +80,7 @@ window.carregarMes = async function() {
   }, 400);
 };
 
-// ── Autenticação e Telas (As funções que estavam dando erro) ──
+// ── Autenticação e Telas ──
 window.irParaRegistro = function() { 
   document.getElementById('login-screen').style.display='none'; 
   document.getElementById('register-screen').style.display='flex'; 
@@ -165,7 +165,7 @@ window.fazerRegistro = async function() {
 window.fazerLogout = function() {
   showModal({ title:"Sair", desc:"Tem certeza que deseja sair?", type:"confirm",
     onConfirm: () => {
-      // Preserva preferências importantes no localstorage
+      // Preserva preferências importantes no localstorage (Faturas e Prompt do iOS)
       const keysToKeep = ['finzap_ios_prompt'];
       for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -196,11 +196,11 @@ window.onload = () => {
     iniciarApp(); 
   }
 
-  // Lógica da caixa de input de texto e enter
+  // Lógica da caixa de input de texto
   document.getElementById('btn-send').onclick = () => {
     const m = document.getElementById('msg');
     if (m.value.trim()) { 
-      processar(m.value.trim()); // Função de api.js
+      processar(m.value.trim()); // API.js
       m.value = ''; 
       m.style.height = ''; 
     }
@@ -218,25 +218,45 @@ window.onload = () => {
     this.style.height = Math.min(this.scrollHeight, 96) + 'px';
   };
 
-  // Tabs Inferiores (Lista, Resumo, Config)
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-      tab.classList.add('active');
-      appState.fil = tab.dataset.f;
+  // ── LÓGICA DA NOVA BOTTOM NAVIGATION BAR ──
+  document.querySelectorAll('.b-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      // Alterna classes ativas
+      document.querySelectorAll('.b-nav-item').forEach(x => x.classList.remove('active'));
+      item.classList.add('active');
+      const tab = item.dataset.tab; // 'lista', 'resumo' ou 'config'
 
-      document.getElementById('txn-list').style.display   = 'none';
-      document.getElementById('empty').style.display      = 'none';
-      document.getElementById('dashboard').classList.remove('active-panel');
-      document.getElementById('config-panel').classList.remove('active-panel');
-
-      if (appState.fil === 'resumo') {
-        document.getElementById('dashboard').classList.add('active-panel');
-      } else if (appState.fil === 'config') {
-        document.getElementById('config-panel').classList.add('active-panel');
-      } else {
-        renderizarTudo(); 
+      // Oculta todas as telas
+      document.querySelectorAll('.tab-content').forEach(v => {
+        v.style.display = 'none';
+        v.classList.remove('active-panel');
+      });
+      
+      // Mostra a tela alvo
+      const targetView = document.getElementById('view-' + tab);
+      if (targetView) {
+        targetView.style.display = 'block';
+        setTimeout(() => targetView.classList.add('active-panel'), 10);
       }
+
+      // Mostra filtros e barra de chat apenas na "Lista"
+      document.getElementById('list-filters').style.display = (tab === 'lista') ? 'flex' : 'none';
+      document.getElementById('chat-wrapper').style.display = (tab === 'lista') ? 'block' : 'none';
+
+      // Re-renderiza os dados se voltar pra lista ou resumo
+      if (tab === 'lista' || tab === 'resumo') {
+        renderizarTudo();
+      }
+    });
+  });
+
+  // ── LÓGICA DOS FILTROS EM PÍLULAS (Lista) ──
+  document.querySelectorAll('.f-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.f-btn').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      appState.fil = btn.dataset.f; // 'todos', 'debito', 'credito', 'pix'
+      renderizarTudo(); // Atualiza a lista na hora
     });
   });
 };
