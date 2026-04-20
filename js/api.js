@@ -72,6 +72,63 @@ function processarExclusao(t, deleteAll) {
     .catch(() => toast("Erro de conexão", true));
 }
 
+// ------------------------------------------------------------
+// NOVA FUNÇÃO: EDITAR COMPRA (ENVIA PARA O BACKEND)
+// ------------------------------------------------------------
+function editarCompraBackend(dadosEditados, editAll) {
+  const mesAtual = strMesBackend(appState.dataVisualizacao);
+
+  // 1. Atualiza memória otimista imediatamente
+  if (editAll) {
+    Object.keys(appState.memoriaCache).forEach(m => {
+      appState.memoriaCache[m] = appState.memoriaCache[m].map(x => {
+        if (x.idTransacao === dadosEditados.idTransacao) {
+          // Atualiza dados, mas preserva a parcela e mês específicos de cada item parcelado
+          return { ...x, ...dadosEditados, parcelaNum: x.parcelaNum, mesAno: x.mesAno };
+        }
+        return x;
+      });
+    });
+  } else {
+    if (appState.memoriaCache[mesAtual]) {
+      appState.memoriaCache[mesAtual] = appState.memoriaCache[mesAtual].map(x => {
+        if (x.idTransacao === dadosEditados.idTransacao && x.parcelaNum === dadosEditados.parcelaNum) {
+          return { ...x, ...dadosEditados };
+        }
+        return x;
+      });
+    }
+  }
+
+  // Atualiza tela na hora
+  appState.txns = appState.memoriaCache[mesAtual] || [];
+  renderizarTudo();
+
+  // 2. Dispara requisição silenciosa
+  const payload = {
+    action: 'edit',
+    user: appState.userId,
+    idTransacao: dadosEditados.idTransacao,
+    parcelaNum: dadosEditados.parcelaNum,
+    editAll: editAll,
+    produto: dadosEditados.produto,
+    valor: dadosEditados.valor,
+    tipo: dadosEditados.tipo,
+    categoria: dadosEditados.categoria,
+    mensagem: dadosEditados.mensagem
+  };
+
+  fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify(payload) })
+    .then(() => {
+        toast("Compra atualizada!");
+        // Garante sincronia final com a planilha
+        if (strMesBackend(appState.dataVisualizacao) === mesAtual) {
+            fetchPlanilha(mesAtual);
+        }
+    })
+    .catch(() => toast("Erro ao editar", true));
+}
+
 // --- INTELIGÊNCIA ARTIFICIAL (CLAUDE) ---
 
 async function processar(txt) {

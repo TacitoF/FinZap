@@ -198,7 +198,12 @@ function editBase() {
         appState.salarioBase = parseDinheiro(v);
         localStorage.setItem('finzap_salario_base', appState.salarioBase);
         renderizarTudo();
-        atualizarBaseBackend(appState.salarioBase); // Vem do api.js
+        
+        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action:'updateBase', user:appState.userId, salarioBase: appState.salarioBase }) })
+          .then(() => {
+             toast("Salário salvo!");
+             fetchPlanilha(strMesBackend(appState.dataVisualizacao));
+          });
       }
     }
   });
@@ -221,11 +226,18 @@ function editExtra() {
         const novo = v.trim() === "0" ? 0 : atual + parseDinheiro(v);
         setRendaExtra(mes, novo);
         renderizarTudo();
-        atualizarExtraBackend(mes, novo); // Vem do api.js
+        
+        fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action:'updateExtra', user:appState.userId, mesAno:mes, valor:novo }) })
+          .then(() => {
+             toast("Renda extra salva!");
+             fetchPlanilha(mes);
+          });
       }
     }
   });
 }
+
+// ── Ações de Transação: Excluir e Editar ────────────────────────
 
 function excluirTxn(idTransacao) {
   const t = appState.txns.find(x => x.idTransacao === idTransacao);
@@ -248,6 +260,81 @@ function excluirTxn(idTransacao) {
     });
   }
 }
+
+function editarTxn(idTransacao) {
+  const t = appState.txns.find(x => x.idTransacao === idTransacao);
+  if (!t) return;
+
+  // HTML customizado para os inputs de edição
+  const html = `
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px; text-align:left;">
+      <div>
+        <label style="font-size:11px; color:var(--t3); text-transform:uppercase;">Produto</label>
+        <input type="text" id="edit-prod" class="log-input" value="${t.produto}" style="padding:10px; margin-top:4px;">
+      </div>
+      <div>
+        <label style="font-size:11px; color:var(--t3); text-transform:uppercase;">Valor (R$)</label>
+        <input type="text" inputmode="decimal" id="edit-val" class="log-input" value="${t.valor}" style="padding:10px; margin-top:4px;">
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <label style="font-size:11px; color:var(--t3); text-transform:uppercase;">Tipo</label>
+          <select id="edit-tipo" class="log-input" style="padding:10px; margin-top:4px; font-family:inherit; font-size:14px; background:var(--s2); color:var(--t1); border:1px solid var(--b2); outline:none;">
+            <option value="debito" ${t.tipo==='debito'?'selected':''}>Débito</option>
+            <option value="credito" ${t.tipo==='credito'?'selected':''}>Crédito</option>
+            <option value="pix" ${t.tipo==='pix'?'selected':''}>Pix</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:11px; color:var(--t3); text-transform:uppercase;">Categoria</label>
+          <input type="text" id="edit-cat" class="log-input" value="${t.categoria || 'Outros'}" style="padding:10px; margin-top:4px;">
+        </div>
+      </div>
+    </div>
+  `;
+
+  const buttons = [];
+  if (t.parcelas > 1) {
+    buttons.push({ text: "Salvar em Todas", class: "confirm", onClick: () => aplicarEdicao(t, true) });
+    buttons.push({ text: "Salvar Só Nesta", class: "confirm", onClick: () => aplicarEdicao(t, false) });
+    buttons.push({ text: "Cancelar", class: "cancel" });
+  } else {
+    buttons.push({ text: "Salvar", class: "confirm", onClick: () => aplicarEdicao(t, false) });
+    buttons.push({ text: "Cancelar", class: "cancel" });
+  }
+
+  showModal({
+    title: "Editar Transação",
+    desc: html,
+    customButtons: buttons
+  });
+}
+
+function aplicarEdicao(tOriginal, editAll) {
+  const nProd = document.getElementById('edit-prod').value.trim();
+  const nVal = parseDinheiro(document.getElementById('edit-val').value);
+  const nTipo = document.getElementById('edit-tipo').value;
+  const nCat = document.getElementById('edit-cat').value.trim();
+
+  if (!nProd || nVal <= 0) {
+     toast("Preencha o nome e o valor!", true);
+     return;
+  }
+
+  const dadosEditados = {
+    idTransacao: tOriginal.idTransacao,
+    parcelaNum: tOriginal.parcelaNum,
+    produto: nProd,
+    valor: nVal,
+    tipo: nTipo,
+    categoria: nCat || "Outros",
+    mensagem: tOriginal.mensagem 
+  };
+
+  // Chama a função do api.js que salvará na memória e na planilha
+  editarCompraBackend(dadosEditados, editAll); 
+}
+
 
 // ── Renderização Principal ───────────────────────────────────────
 
@@ -345,6 +432,8 @@ function renderizarTudo() {
 
     const el = document.createElement('div');
     el.className = 'txn';
+    
+    // Novo container para os botões de edição e exclusão (ajuste visual feito na div interna)
     el.innerHTML = `
       <div class="txn-ic ${bg}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none">${svgs[t.tipo]||svgs.debito}</svg></div>
       <div class="txn-body">
@@ -352,13 +441,18 @@ function renderizarTudo() {
         <div class="txn-sub">${sub}</div>
         ${descHtml}
       </div>
-      <div class="txn-right">
+      <div class="txn-right" style="padding-right: 64px;">
         <div class="txn-val">-${fmt(t.valor)}</div>
         <div class="badges">${catB}<span class="bdg ${bdgs[1]}">${bdgs[0]}</span>${t.parcelas>1?`<span class="bdg bdg-a">${t.parcelas}x</span>`:''}</div>
       </div>
-      <button class="btn-del" onclick="excluirTxn('${t.idTransacao}')" aria-label="Excluir">
-        <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-      </button>`;
+      <div style="position: absolute; right: 0; top: 0; height: 100%; display: flex;">
+        <button onclick="editarTxn('${t.idTransacao}')" style="width: 32px; height: 100%; background: rgba(91,94,244,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--vi); transition: 0.2s;" aria-label="Editar">
+          <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </button>
+        <button class="btn-del" onclick="excluirTxn('${t.idTransacao}')" aria-label="Excluir" style="position: relative; border-left: 1px solid var(--b1); width: 32px;">
+          <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>`;
     list.appendChild(el);
   });
 }
