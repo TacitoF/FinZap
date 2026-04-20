@@ -335,6 +335,86 @@ function aplicarEdicao(tOriginal, editAll) {
   editarCompraBackend(dadosEditados, editAll); 
 }
 
+// ── Processamento de Áudio (Microfone → Whisper → Claude) ────────
+
+/**
+ * Recebe o Blob de áudio gravado pelo MediaRecorder,
+ * envia para /api/whisper (proxy OpenAI Whisper),
+ * e passa o texto transcrito para processar() (api.js).
+ */
+window.processarAudio = async function(audioBlob) {
+  const dots = document.getElementById('dots');
+  const btnMic = document.getElementById('btn-mic');
+
+  // Garante que o indicador de carregamento esteja visível
+  dots.classList.add('on');
+  btnMic.disabled = true;
+
+  try {
+    // Monta o FormData exigido pela API Whisper
+    const formData = new FormData();
+
+    // O Whisper aceita webm, mp4, ogg, wav, etc.
+    // Detecta a extensão correta com base no mimeType do Blob
+    const mimeType = audioBlob.type || 'audio/webm';
+    const ext = mimeType.includes('ogg') ? 'ogg'
+              : mimeType.includes('mp4') ? 'mp4'
+              : mimeType.includes('wav') ? 'wav'
+              : 'webm';
+
+    formData.append('file', audioBlob, `audio.${ext}`);
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'pt'); // Força português para melhor precisão
+
+    const response = await fetch('/api/whisper', {
+      method: 'POST',
+      body: formData
+      // Não definir Content-Type aqui: o browser precisa
+      // setar o boundary do multipart/form-data automaticamente
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Whisper error:', data);
+      toast('Erro na transcrição. Tente novamente.', true);
+      dots.classList.remove('on');
+      btnMic.disabled = false;
+      return;
+    }
+
+    const textoTranscrito = (data.text || '').trim();
+
+    if (!textoTranscrito) {
+      toast('Não entendi o áudio. Tente falar mais alto.', true);
+      dots.classList.remove('on');
+      btnMic.disabled = false;
+      return;
+    }
+
+    // Mostra o texto transcrito no campo de input como feedback visual
+    const msgInput = document.getElementById('msg');
+    msgInput.value = textoTranscrito;
+    msgInput.style.height = '';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, 96) + 'px';
+
+    // dots será removido dentro de processar() após a resposta do Claude
+    // Passa direto para o fluxo normal de processamento
+    await processar(textoTranscrito);
+
+    // Limpa o input após processar
+    msgInput.value = '';
+    msgInput.style.height = '';
+
+  } catch (err) {
+    console.error('processarAudio erro:', err);
+    toast('Erro de conexão com o servidor.', true);
+    dots.classList.remove('on');
+  } finally {
+    btnMic.disabled = false;
+  }
+};
+
 // ── Renderização Principal ───────────────────────────────────────
 
 function renderizarTudo() {
@@ -442,7 +522,7 @@ function renderizarTudo() {
         </div>
         <div class="txn-right" style="padding-right: 64px;">
           <div class="txn-val">-${fmt(t.valor)}</div>
-          <div class="badges">${catB}<span class="bdg ${bdgs[1]}\">${bdgs[0]}</span>${t.parcelas>1?`<span class="bdg bdg-a">${t.parcelas}x</span>`:''}</div>
+          <div class="badges">${catB}<span class="bdg ${bdgs[1]}">${bdgs[0]}</span>${t.parcelas>1?`<span class="bdg bdg-a">${t.parcelas}x</span>`:''}</div>
         </div>
         <div style="position: absolute; right: 0; top: 0; height: 100%; display: flex;">
           <button onclick="editarTxn('${t.idTransacao}')" style="width: 32px; height: 100%; background: rgba(91,94,244,.1); border: none; border-left: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--vi); transition: 0.2s;" aria-label="Editar">

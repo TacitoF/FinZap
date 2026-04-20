@@ -2,18 +2,16 @@
 //  FINZAP — Estado Central e Inicialização (App)
 // ================================================================
 
-// Constante para as rotas de Auth
 const APP_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxTTSsjsXUWidIsRUcRQGKLiHgYCALPex7fyXVY_e2ttVTwAjNHKvRb_tPYaIFjnPJWAg/exec";
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 
-// ── Estado Global (Compartilhado com api.js e ui.js)
 window.appState = {
   userId: localStorage.getItem('finzap_user') || "",
   userName: localStorage.getItem('finzap_nome') || "",
   salarioBase: parseFloat(localStorage.getItem('finzap_salario_base')) || 0,
   dataVisualizacao: new Date(),
   txns: [],
-  fil: 'todos', // filtro padrão
+  fil: 'todos',
   memoriaCache: {}
 };
 
@@ -23,7 +21,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
-// ── Utilitários Globais ──
 window.gerarId = function() { return Date.now().toString(36) + Math.random().toString(36).slice(2); };
 window.parseDinheiro = function(val) {
   const s = String(val).trim();
@@ -43,7 +40,6 @@ window.mesOffset = function(mesStr, offset) {
 window.getRendaExtra = function(mes) { return parseFloat(localStorage.getItem(`finzap_extra_${appState.userId}_${mes}`)) || 0; };
 window.setRendaExtra = function(mes, v) { localStorage.setItem(`finzap_extra_${appState.userId}_${mes}`, v); };
 
-// ── Navegação e Carregamento ──
 window.mudarMes = function(offset) {
   appState.dataVisualizacao = new Date(appState.dataVisualizacao.getFullYear(), appState.dataVisualizacao.getMonth() + offset, 1);
   carregarMes(); 
@@ -51,7 +47,7 @@ window.mudarMes = function(offset) {
 
 window.iniciarApp = function() {
   carregarMes();
-  setTimeout(verificarDiaFatura, 600); // Função de UI.js (só roda após o userId existir)
+  setTimeout(verificarDiaFatura, 600); 
 };
 
 window.carregarMes = async function() {
@@ -75,12 +71,11 @@ window.carregarMes = async function() {
   window._syncTimer = setTimeout(async () => {
     if (strMesBackend(appState.dataVisualizacao) !== mesStr) return;
     document.getElementById('sync-icon').classList.add('on');
-    await fetchPlanilha(mesStr); // API.js
+    await fetchPlanilha(mesStr); 
     document.getElementById('sync-icon').classList.remove('on');
   }, 400);
 };
 
-// ── Autenticação e Telas ──
 window.irParaRegistro = function() { 
   document.getElementById('login-screen').style.display='none'; 
   document.getElementById('register-screen').style.display='flex'; 
@@ -165,7 +160,6 @@ window.fazerRegistro = async function() {
 window.fazerLogout = function() {
   showModal({ title:"Sair", desc:"Tem certeza que deseja sair?", type:"confirm",
     onConfirm: () => {
-      // Preserva preferências importantes no localstorage (Faturas e Prompt do iOS)
       const keysToKeep = ['finzap_ios_prompt'];
       for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -186,7 +180,6 @@ window.fazerLogout = function() {
   });
 };
 
-// ── Eventos Visuais ao carregar a página ──
 window.onload = () => {
   if (!appState.userId) {
     document.getElementById('login-screen').style.display = 'flex';
@@ -196,11 +189,10 @@ window.onload = () => {
     iniciarApp(); 
   }
 
-  // Lógica da caixa de input de texto
   document.getElementById('btn-send').onclick = () => {
     const m = document.getElementById('msg');
     if (m.value.trim()) { 
-      processar(m.value.trim()); // API.js
+      processar(m.value.trim()); 
       m.value = ''; 
       m.style.height = ''; 
     }
@@ -218,45 +210,87 @@ window.onload = () => {
     this.style.height = Math.min(this.scrollHeight, 96) + 'px';
   };
 
-  // ── LÓGICA DA NOVA BOTTOM NAVIGATION BAR ──
+  // ── LÓGICA DO MICROFONE ──
+  let mediaRecorder;
+  let audioChunks = [];
+  const btnMic = document.getElementById('btn-mic');
+
+  async function initMic() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        // Envia o áudio gravado
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        audioChunks = [];
+        if (window.processarAudio) window.processarAudio(audioBlob); 
+      };
+    } catch (err) {
+      console.error("Erro mic:", err);
+      if (window.toast) toast("Permita o uso do microfone.", true);
+    }
+  }
+
+  const startRec = async (e) => {
+    e.preventDefault();
+    if (!mediaRecorder) await initMic();
+    if (mediaRecorder && mediaRecorder.state === "inactive") {
+      audioChunks = [];
+      mediaRecorder.start();
+      btnMic.classList.add('recording');
+    }
+  };
+
+  const stopRec = (e) => {
+    e.preventDefault();
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop();
+      btnMic.classList.remove('recording');
+      document.getElementById('dots').classList.add('on');
+    }
+  };
+
+  if (btnMic) {
+    btnMic.addEventListener('mousedown', startRec);
+    btnMic.addEventListener('touchstart', startRec, {passive: false});
+    btnMic.addEventListener('mouseup', stopRec);
+    btnMic.addEventListener('mouseleave', stopRec);
+    btnMic.addEventListener('touchend', stopRec);
+  }
+
   document.querySelectorAll('.b-nav-item').forEach(item => {
     item.addEventListener('click', () => {
-      // Alterna classes ativas
       document.querySelectorAll('.b-nav-item').forEach(x => x.classList.remove('active'));
       item.classList.add('active');
-      const tab = item.dataset.tab; // 'lista', 'resumo' ou 'config'
+      const tab = item.dataset.tab; 
 
-      // Oculta todas as telas
       document.querySelectorAll('.tab-content').forEach(v => {
         v.style.display = 'none';
         v.classList.remove('active-panel');
       });
       
-      // Mostra a tela alvo
       const targetView = document.getElementById('view-' + tab);
       if (targetView) {
         targetView.style.display = 'block';
         setTimeout(() => targetView.classList.add('active-panel'), 10);
       }
 
-      // Mostra filtros e barra de chat apenas na "Lista"
       document.getElementById('list-filters').style.display = (tab === 'lista') ? 'flex' : 'none';
       document.getElementById('chat-wrapper').style.display = (tab === 'lista') ? 'block' : 'none';
 
-      // Re-renderiza os dados se voltar pra lista ou resumo
       if (tab === 'lista' || tab === 'resumo') {
         renderizarTudo();
       }
     });
   });
 
-  // ── LÓGICA DOS FILTROS EM PÍLULAS (Lista) ──
   document.querySelectorAll('.f-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.f-btn').forEach(x => x.classList.remove('active'));
       btn.classList.add('active');
-      appState.fil = btn.dataset.f; // 'todos', 'debito', 'credito', 'pix'
-      renderizarTudo(); // Atualiza a lista na hora
+      appState.fil = btn.dataset.f; 
+      renderizarTudo(); 
     });
   });
 };
